@@ -1,0 +1,26 @@
+cmake_minimum_required(VERSION 3.25.1)
+project(fun)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# include_directories(include)
+include_directories(funlang PRIVATE ${PROJECT_SOURCE_DIR}/include)
+set(SOURCES 
+src/main.cpp
+src/lex/lex.cpp 
+src/parser/util.cpp
+src/parser/parser.cpp 
+# src/parser/expr.cpp 
+src/parser/Ast.cpp 
+)
+
+add_executable(fun ${SOURCES})
+
+file(GLOB_RECURSE INCS RELATIVE "${PROJECT_SOURCE_DIR}" "include/*.hpp")
+file(GLOB_RECURSE SRCS RELATIVE "${PROJECT_SOURCE_DIR}" "src/*.cpp")
+
+target_include_directories(fun PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+

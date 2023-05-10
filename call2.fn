@@ -1,0 +1,21 @@
+
+let io = #import();
+
+let vector := struct<T>{
+        a:*type,
+        b:*T 
+};
+
+struct vector<T>{
+a:*type,
+b:*T
+};
+
+let write is extern[];
+extern["stdio.h"] fn write();
+extern["stdio.h"] call:i32;
+
+fn main() -> i32 {
+
+}
+
