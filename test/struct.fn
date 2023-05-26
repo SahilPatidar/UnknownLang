@@ -1,0 +1,9 @@
+import std;
+
+struct data<T>{
+    val: T,
+};
+
+fn main() {
+    let v: data<i32> = data<i32>{0};
+}

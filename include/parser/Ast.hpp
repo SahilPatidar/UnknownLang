@@ -6,6 +6,7 @@
 #include"../lex/lex.hpp"
 #include"../analyzer/AstVisitor.hpp"
 #include"type.hpp"
+#include"../analyzer/Value.hpp"
 // #include"lex/lex.hpp"
 // #include"analyzer/AstVisitor.hpp"
 // #include"type.hpp"
@@ -54,32 +55,52 @@ namespace ast{
         NodeMatchStmt,
         
         NodeCallExpr,
-        NodeFNStm,
+        NodeFNStm
     };
 
 
     class Ast {
+    protected:
+        Type *type;
+        Type *castTo;
+        VALUE *value;
+        Ast* Decl;
     public:
-        virtual ~Ast() {} //= default;
+        virtual ~Ast() = default;
+
+        inline void setDecl(Ast *_Decl) { Decl = _Decl; }
+        inline Ast* getDecl() const { return Decl; }
+        inline void setType(Type *_type) { type = _type; }
+        inline void setValue(VALUE *_value) { value = _value; }
+        inline void setTypeValue(Type *_type, VALUE *_value) {
+            type = _type;
+            value = _value; 
+        }
+        inline Type* getTypeInfo() const { return type; }
+        inline VALUE* getValueInfo() const { return value; }
+        inline bool setCastTo(Type *to) { 
+            castTo = to;
+        }
+        virtual tokt token() const = 0;
         virtual std::string toString() const = 0;
+        virtual bool accept(AstVisitor& visitor) const;
         virtual NodeCategory nodeCategory() const = 0;
-        virtual void accept(AstVisitor& visitor) const = 0;
     };
    
-    using AstPtr = std::shared_ptr<Ast>;
 
 
 
-    class BlockStatement: public Ast {
+    class BlockStmt: public Ast {
     private:
-        std::vector<AstPtr> statms;
+        std::vector<Ast *> statms;
     public:
-        BlockStatement(std::vector<AstPtr> &_state)
+        BlockStmt(std::vector<Ast *> &_state)
             :statms(_state) {}
 
-        std::vector<AstPtr> getStmts() const {return statms;}
+        static BlockStmt *Create(std::vector<Ast *> &statms);
+        std::vector<Ast *> getStmts() const {return statms;}
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
         NodeCategory nodeCategory() const { return NodeBlockStm; }
     };
 
@@ -92,9 +113,11 @@ namespace ast{
         NumericLiteral(tokt &_tok)
         : tok(_tok) {}
 
+        static NumericLiteral *Create(tokt &_tok);
         tokt token() const { return tok; };
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeNumLit; }
     };
 
@@ -106,10 +129,12 @@ namespace ast{
         BoolLiteral(tokt &_tok)
         : tok(_tok) {}
 
+        static BoolLiteral *Create(tokt &_tok);
         //std::string value() const;
         tokt token() const { return tok; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeBoolLit; }
     };
 
@@ -122,11 +147,13 @@ namespace ast{
         StringLiteral(tokt &_tok, bool _chr)
         : tok(_tok), chr(_chr) {}
 
+        static StringLiteral *Create(tokt &_tok, bool _chr);
         tokt token() const{ return tok; }
         //std::string value() const{ return tok.data; }
         bool ischar() const{ return chr; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeStrLit; }
     };
 
@@ -138,9 +165,11 @@ namespace ast{
         NullLiteral(tokt &_tok)
         : tok(_tok) {}
 
+        static NullLiteral *Create(tokt &_tok);
         tokt token() const{ return tok; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeNullLit; }
     };
 
@@ -152,10 +181,12 @@ namespace ast{
         FloatLiteral(tokt &_tok)
         :tok(_tok) {}
 
+        static FloatLiteral *Create(tokt &_tok);
         tokt token() const{ return tok; }
         //std::string value() const { return tok.data; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeFloatLit; }
     };
 
@@ -163,37 +194,63 @@ namespace ast{
     class Identifier: public Ast {
         private:
         tokt tok;
-        //TypePtr typeinfo;
+
         public:
         Identifier(tokt &_tok)
             :tok(_tok) {}
 
+        static FloatLiteral *Create(tokt &_tok);
         tokt token() const { return tok; }
-        // TypePtr typeInfo() const { return typeinfo; }
-        // void setTypeInfo(TypePtr &type) { typeinfo = type; }
-        std::string ident() const { return tok.data; }
-        bool HasSelf() const { return IsSelf; }
+        std::string getIdent() const { return tok.data; }
+        // bool HasSelf() const { return IsSelf; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeIdent; }
     };
 
 
     class EnumExpr: public Ast {
         private:
+        tokt Name;
         std::vector<tokt>udata;
-        std::vector<AstPtr>val;
+        std::vector<Ast *>val;
         public:
-        EnumExpr(std::vector<tokt>&_u_data, std::vector<AstPtr>&_val)
-        :udata(_u_data), val(_val)
+        EnumExpr(tokt &_Name, std::vector<tokt>&_u_data, std::vector<Ast *>&_val)
+        :Name(_Name), udata(_u_data), val(_val)
         {}
 
+        static EnumExpr *Create(tokt &_Name, std::vector<tokt>&_u_data, std::vector<Ast *>&_val);
         // tokt token() const{ return tok; }
-        // AstPtr getType() const{ return ty; }
+        // Ast * getType() const{ return ty; }
+        tokt getName() const{ return Name; }
         std::vector<tokt> getuData() const{ return udata; }
-        std::vector<AstPtr> getValue() const{ return val; }
+        std::vector<Ast *> getValue() const{ return val; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
+        NodeCategory nodeCategory() const { return NodeEnum; }
+    };
+
+    class Method: public Ast {
+    private:
+        tokt tok;
+        tokt Name;
+        Ast * AssociateTo;
+        std::vector<Ast *>Impl;
+    public:
+        Method(tokt &_tok, tokt &_Name, Ast * &_AssociateTo, std::vector<Ast *>&_impl)
+        :tok(_tok), Name(_Name), AssociateTo(_AssociateTo), Impl(_impl)
+        {}
+
+        static Method *Create(tokt &_tok, tokt &_Name, Ast * &_AssociateTo, std::vector<Ast *>&_impl);
+        tokt token() const{ return tok; }
+        tokt getName() const{ return Name; }
+        Ast * getAssociativity() const{ return AssociateTo; }
+        std::vector<Ast *> getImpl() const{ return Impl; }
+        std::string toString() const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeEnum; }
     };
 
@@ -206,12 +263,12 @@ namespace ast{
         PreDefineType(tokt &_tok)
         : tok(_tok) 
         {}
-        //TypePtr setTy(TypePtr ty){typeinfo=ty;}
-        //TypePtr getTy()const{return typeinfo;}
+        static PreDefineType *Create(tokt &_tok);
         tokt token() const{ return tok; }
         Token_type getType() const{ return tok.tok_type; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const {return NodePreDefTy;}
 
     };
@@ -220,97 +277,115 @@ namespace ast{
         private:
         tokt tok;
         Token_type op;
-        AstPtr base;
+        Ast * base;
         bool isType;
         int DefCount;
         NodeCategory nodeKind;
         public:
-        PrefixExpr(tokt &tok, Token_type &_op, AstPtr &_type, bool &_isType, int &_DefCount, NodeCategory _nodeKind)
+        PrefixExpr(tokt &tok, Token_type &_op, Ast * &_type, bool &_isType, int &_DefCount, NodeCategory _nodeKind)
         : tok(tok), op(_op), base(_type), isType(_isType), DefCount(_DefCount), nodeKind(_nodeKind) {}
 
+        static PrefixExpr *Create(tokt &tok, Token_type &_op, Ast * &_type, bool _isType, int _DefCount, NodeCategory _nodeKind);
         tokt token() const { return tok; }
         Token_type getOp() const { return op; }
         int getDefCount() const { return DefCount; }
-        AstPtr getBase() const { return base; }
+        Ast * getBase() const { return base; }
         bool IsType() const { return isType; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return nodeKind; }
     };
+
+    
 
     class PostfixExpr: public Ast{
         private:
         tokt tok;
-        AstPtr var;
+        Ast * var;
         std::vector<tokt>Temp;
-        std::vector<AstPtr>expr;
+        std::vector<Ast *>expr;
         NodeCategory nodeKind;
-        bool isType;
+        // bool isType;
         public:
-        PostfixExpr(tokt &tok,  AstPtr &_var, std::vector<tokt>&_Temp, std::vector<AstPtr> &_v, NodeCategory _nodeKind)
+        PostfixExpr(tokt &tok,  Ast * &_var, std::vector<tokt>&_Temp, std::vector<Ast *> &_v, NodeCategory _nodeKind)
         : tok(tok), var(_var), Temp(_Temp), expr(_v), nodeKind(_nodeKind) {}
+        
+        PostfixExpr(tokt &tok,  Ast * &_var, std::vector<Ast *> &_v, NodeCategory _nodeKind)
+        : tok(tok), var(_var), expr(_v), nodeKind(_nodeKind) {}
 
+        static PostfixExpr *Create(tokt &tok,  Ast * &_var, std::vector<tokt>&_Temp, std::vector<Ast *> &_v, NodeCategory _nodeKind);
+        static PostfixExpr *Create(tokt &tok,  Ast * &_var, std::vector<Ast *> &_v, NodeCategory _nodeKind);
+        void SetType(Type *_type) { type = _type; }
         tokt token() const { return tok; }
-        AstPtr getVar() const { return var; }
+        Ast * getVar() const { return var; }
         std::vector<tokt> getTemp() const { return Temp; }
         bool HasTemp() const {return !Temp.empty();}
-        std::vector<AstPtr> getExpr() const { return expr; }
+        std::vector<Ast *> getExpr() const { return expr; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return nodeKind; }
     };
 
     class Expression: public Ast{
         private:
-        AstPtr LHS;
+        Ast * LHS;
         Token_type Op;
-        AstPtr RHS;
+        Ast * RHS;
         bool isInParen;
         NodeCategory NodeKind;
         public:
-        Expression(AstPtr &_LHS, Token_type _op, AstPtr &_RHS,
+        Expression(Ast *&_LHS, Token_type _op, Ast *&_RHS,
                      NodeCategory &_nodeKind)
         :LHS(_LHS),Op(_op), RHS(_RHS), NodeKind(_nodeKind)
         {}
 
+        static Expression *Create(Ast *_LHS, Token_type _op, Ast *_RHS,
+                     NodeCategory _nodeKind);
         // tokt token() const {return tok;}
-        AstPtr getLhs() const {return LHS;}
+        Ast * getLhs() const {return LHS;}
         Token_type getOp() const {return Op;}
-        AstPtr getRhs() const {return RHS;}
+        Ast * getRhs() const {return RHS;}
         // bool isInGrouped() const{return isInParen;}
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory()const {return NodeKind;}
 
     };
 
     class GroupedExpr:public Ast {
-        AstPtr expr;
+        Ast * expr;
         public:
-        GroupedExpr(AstPtr &_expr)
+        GroupedExpr(Ast * &_expr)
         :expr(_expr) {}
 
-        AstPtr getExpression() const { return expr; }
+        static GroupedExpr *Create(Ast * &_expr);
+        Ast * getExpression() const { return expr; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const {return NodeGroupExpr;}
     };
 
-    class FunType: public Ast {
+    class FnType: public Ast {
         private:
         tokt tok;
-        std::vector<AstPtr> ty;
-        AstPtr ret;
+        std::vector<Ast *> ty;
+        Ast * ret;
        
         public:
-        FunType(tokt &tok, std::vector<AstPtr> &_ty, AstPtr &_ret)
+        FnType(tokt &tok, std::vector<Ast *> &_ty, Ast * &_ret)
         : tok(tok), ty(_ty), ret(_ret) {}
 
+        static FnType *Create(tokt &tok, std::vector<Ast *> &_ty, Ast * &_ret);
         tokt token() const { return tok; }
-        std::vector<AstPtr> type() const { return ty; }
-        AstPtr retval() const { return ret; }
+        std::vector<Ast *> getParamType() const { return ty; }
+        Ast * getRetType() const { return ret; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeFnTy; }
     };
 
@@ -318,35 +393,39 @@ namespace ast{
         private:
         tokt tok;
         tokt Ident;
-        AstPtr type;
+        Ast * type;
 
         public:
-        TypeStmt(tokt &_tok, tokt &_Ident ,AstPtr &_type)
+        TypeStmt(tokt &_tok, tokt &_Ident ,Ast * &_type)
         : tok(_tok), Ident(_Ident), type(_type) {}
 
+        static TypeStmt *Create(tokt &_tok, tokt &_Ident ,Ast * &_type);
         tokt token() const { return tok; }
         tokt getIdent() const{ return Ident; }
-        AstPtr getType() const{ return type; }
+        Ast * getType() const{ return type; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeTypeStm; }
     };
 
     
-    class ArrayTy: public Ast {
+    class Array: public Ast {
         private:
         tokt tok;
-        std::vector<AstPtr> size;
-        AstPtr type;
+        std::vector<Ast *> size;
+        Ast * type;
         public:
-        ArrayTy(tokt &_tok,std::vector<AstPtr> &_size, AstPtr &_type)
+        Array(tokt &_tok,std::vector<Ast *> &_size, Ast * &_type)
         : tok(_tok), size(_size), type(_type) {}
 
+        static Array *Create(tokt &_tok,std::vector<Ast *> &_size, Ast * &_type);
         tokt token() const{ return tok; }
-        std::vector<AstPtr> getArraySize() const{return size;}
-        AstPtr getArrayType() const{return type;}
+        std::vector<Ast *> getArraySize() const{return size;}
+        Ast * getArrayType() const{return type;}
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeArray; }
     };
 
@@ -355,54 +434,39 @@ namespace ast{
     class Extern: public Ast {
         private:
         tokt tok;
-        std::vector<AstPtr> header;
+        std::vector<Ast *> header;
         public:
-        Extern(tokt &_tok, std::vector<AstPtr> &_header)
+        Extern(tokt &_tok, std::vector<Ast *> &_header)
         :tok(_tok), header(_header){}
 
+        static Extern *Create(tokt &_tok, std::vector<Ast *> &_header);
         tokt token() const {return tok;}
-        std::vector<AstPtr> getHeader() const {return header;}
-        // AstPtr getBlock()const {return block;}
+        std::vector<Ast *> getHeader() const {return header;}
+        // Ast * getBlock()const {return block;}
         std::string toString() const;
+        bool accept(AstVisitor& visitor) const;
         //void accept(AstVisitor &vistitor) const;
         NodeCategory nodeCategory() const {return NodeExtern;}
-    };
-
-
-    class Import: public Ast{
-    private:
-        tokt tok;
-        AstPtr name;
-        AstPtr path;
-
-    public:
-        Import(tokt &_tok, AstPtr &_name, AstPtr &_path)
-        : tok(_tok), path(_path) {}
-
-        tokt token() const {return tok;}
-        AstPtr nameof() const {return name;}
-        AstPtr import_path() const {return path;}
-        std::string toString() const;
-        void accept(AstVisitor& visitor) const;
-         NodeCategory nodeCategory() const { return NodeImport; }
     };
 
 
     class WhileLoop: public Ast{
     private:
         tokt tok;
-        AstPtr expr;
-        AstPtr body;
+        Ast * expr;
+        Ast * body;
 
     public:
-        WhileLoop(tokt &_tok, AstPtr &_expr, AstPtr &_body )
+        WhileLoop(tokt &_tok, Ast * &_expr, Ast * &_body )
             :tok(_tok), expr(_expr), body(_body)  {}
 
-        AstPtr expression() const { return expr; }
-        AstPtr loopbody() const { return body; }
+        static WhileLoop *Create(tokt &_tok, Ast * &_expr, Ast * &_body );
+        Ast * getCond() const { return expr; }
+        Ast * getBlock() const { return body; }
         tokt token() const {return tok; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeWhileStm; }
 
     };
@@ -411,45 +475,50 @@ namespace ast{
     class ForLoop: public Ast{
     private:
         tokt tok;
-        AstPtr var;
-        AstPtr cond;
-        AstPtr incr;
-        AstPtr body;
+        Ast * var;
+        Ast * cond;
+        Ast * incr;
+        Ast * body;
 
     public:
-        ForLoop(tokt &_tok, AstPtr &_var, AstPtr &_cond, AstPtr &_incr, AstPtr &_body )
+        ForLoop(tokt &_tok, Ast * &_var, Ast * &_cond, Ast * &_incr, Ast * &_body )
             :tok(_tok), var(_var), cond(_cond), incr(_incr), body(_body)  {}
 
-        AstPtr getVar() const { return var; }
-        AstPtr getCond() const { return cond; }
-        AstPtr getIncr() const { return incr; }
-        AstPtr getBody() const { return body; }
+        static ForLoop *Create(tokt &_tok, Ast * &_var, Ast * &_cond, Ast * &_incr, Ast * &_body );
+        Ast * getVar() const { return var; }
+        Ast * getCond() const { return cond; }
+        Ast * getIncr() const { return incr; }
+        Ast * getBlock() const { return body; }
         tokt token() const {return tok; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeForStm; }
 
     };
 
-    class IfStatement: public Ast{
+    class IfStmt: public Ast{
         private:
         tokt tok;
-        AstPtr cond;
-        AstPtr ifbody;
-        AstPtr elbody;
+        Ast * cond;
+        Ast * ifblock;
+        Ast * elblock;
         
         public:
-        IfStatement(tokt &_tok, AstPtr &_cond , AstPtr &_ifbody,
-                             AstPtr &_elbody)
-        : tok(_tok), cond(_cond), ifbody(_ifbody), 
-                        elbody(_elbody) {}
+        IfStmt(tokt &_tok, Ast * &_cond , Ast * &_ifblock,
+                             Ast * &_elblock)
+        : tok(_tok), cond(_cond), ifblock(_ifblock), 
+                        elblock(_elblock) {}
         
+        static ForLoop *Create(tokt &_tok, Ast * &_cond , Ast * &_ifblock,
+                             Ast * &_elblock);
         tokt token() const { return tok; }
-        AstPtr getCondV() const { return cond; }
-        AstPtr getIfBody() const { return ifbody; }
-        AstPtr getElBody() const { return  elbody; }
+        Ast * getCondV() const { return cond; }
+        Ast * getIfBlock() const { return ifblock; }
+        Ast * getElBlock() const { return  elblock; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeIfStm; }
     };
 
@@ -461,9 +530,11 @@ namespace ast{
         BranchStmt(tokt &_tok)
         : tok(_tok) {}
 
+        static BranchStmt *Create(tokt &_tok);
         tokt token() const { return tok; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeBranchStm; }
     };
 
@@ -471,24 +542,28 @@ namespace ast{
     class StructStmt: public Ast {
         private:
         tokt tok;
+        tokt Name;
         std::vector<tokt>Temp;
         std::vector<tokt> elmtName;
-        std::vector<AstPtr> elmtTy;
-        bool isDecl;
+        std::vector<Ast *> elmtTy;
+        // bool isDecl;
         public:
-        StructStmt(tokt &_tok, std::vector<tokt> &_Temp, std::vector<tokt> &_memName,
-                     std::vector<AstPtr> &_memTy, bool _isDecl)
-        : tok(_tok), Temp(_Temp), elmtName(_memName), elmtTy(_memTy), isDecl(_isDecl) {}
+        StructStmt(tokt &_tok, tokt &_Name, std::vector<tokt> &_Temp, std::vector<tokt> &_memName,
+                     std::vector<Ast *> &_memTy)
+        : tok(_tok), Name(_Name), Temp(_Temp), elmtName(_memName), elmtTy(_memTy) {}
 
+        static BranchStmt *Create(tokt &_tok, tokt &_Name, std::vector<tokt> &_Temp, std::vector<tokt> &_memName,
+                     std::vector<Ast *> &_memTy);
+    
         tokt token() const { return tok; }
-        // AstPtr name() const { return iden; }
+        tokt getName() const { return Name; }
         std::vector<tokt> getTemp() const { return Temp; }
         bool HasTemplate() const { return !Temp.empty(); }
         std::vector<tokt> getIdentList() const { return elmtName; }
-        std::vector<AstPtr> getTypeList() const { return elmtTy; }
-        bool isDeclaration() const { return isDecl; }
+        std::vector<Ast *> getTypeList() const { return elmtTy; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeStructStm; }
     };
 
@@ -496,15 +571,17 @@ namespace ast{
     class ListExpr: public Ast {
         private:
         tokt tok;
-        std::vector<AstPtr>list;
+        std::vector<Ast *>list;
         public:
-        ListExpr(tokt &_tok, std::vector<AstPtr> &_list)
+        ListExpr(tokt &_tok, std::vector<Ast *> &_list)
         :tok(_tok), list(_list) {}
 
+        static ListExpr *Create(tokt &_tok, std::vector<Ast *> &_list);
         tokt token() const { return tok; }
-        std::vector<AstPtr> getList() const { return list; }
+        std::vector<Ast *> getList() const { return list; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeListExpr; }
     };
 
@@ -512,59 +589,58 @@ namespace ast{
     class VarStmt: public Ast {
         private:
         tokt tok;
-        AstPtr name;
-        AstPtr type;
+        Ast * name;
+        Ast * type;
         //TypePtr typeinfo;
-        AstPtr val;
+        Ast * val;
         bool HasConst;
         public:
-        VarStmt(tokt &_tok, AstPtr &_var, AstPtr &_type, AstPtr &_val, bool &_HasConst)
+        VarStmt(tokt &_tok, Ast * &_var, Ast * &_type, Ast * &_val, bool &_HasConst)
         : tok(_tok), name(_var), type(_type), val(_val), HasConst(_HasConst) {}
 
+        static ListExpr *Create(tokt &_tok, Ast *_var, Ast *_type, Ast *_val, bool _HasConst);
         tokt token() const{ return tok; }
-        AstPtr getVarName() const{return name;}
-        AstPtr getType() const{return type;}
-        void SetType(AstPtr &Type) { type = Type;}
-        AstPtr getVal() const{return val;}
+        Ast * getVarName() const{return name;}
+        Ast * getType() const{return type;}
+        void SetType(Ast * &Type) { type = Type;}
+        Ast * getVal() const{return val;}
         bool HasConstStmt() const { return HasConst; }
         // bool getHasIsStmt()const {return HasIsStmt;}
         // TypePtr getType() const {return typeinfo;}
         // void setType(const TypePtr _typeinfo) {typeinfo = _typeinfo;}
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeLetStm; }
     };
 
 
     class FunctionDef: public Ast {
-        private:
+    private:
+        tokt tok;
         tokt Name;
         std::vector<tokt> pName;
-        std::vector<AstPtr> pTy;
-        AstPtr AssociateTo;
-        AstPtr retype;
-        AstPtr body;
-        bool isDecl;
-        static bool isTemp;
-        static bool isBelong;
-        public:
-        FunctionDef(tokt &_Name, std::vector<tokt> &_pName,
-                    std::vector<AstPtr> &_pTy, AstPtr  _retype, 
-                    AstPtr &_AssociateTo, AstPtr &_body, bool _isDecl)
-         : Name(_Name), pName(_pName), pTy(_pTy), AssociateTo(_AssociateTo), 
-            retype(_retype), body(_body), isDecl(_isDecl){}
+        std::vector<Ast *> pTy;
+        Ast * retype;
+        Ast * Block;
+        // bool isDecl;
+    public:
+        FunctionDef(tokt &_tok, tokt &_Name, std::vector<tokt> &_pName,
+                    std::vector<Ast *> &_pTy, Ast *  _retype, Ast * &_Block)
+         : tok(_tok), Name(_Name), pName(_pName), pTy(_pTy), 
+            retype(_retype), Block(_Block){}
 
-        // tokt token() const { return Name; }
+        static FunctionDef *Create(tokt &_tok, tokt &_Name, std::vector<tokt> &_pName,
+                    std::vector<Ast *> &_pTy, Ast *  _retype, Ast * &_Block);
+        tokt token() const { return tok; }
         tokt getFuncName() const { return Name; }
         std::vector<tokt> getParameterNames() const { return pName; }
-        std::vector<AstPtr> getParameterTy() const { return pTy; }
-        AstPtr getResultType() const { return retype; }
-        AstPtr getFuncBody() const { return body; }
-        bool isDeclaration() const { return isDecl; }
-        bool HasStructFunc() const { return AssociateTo != nullptr; }
-        AstPtr getStructFunc() const { return AssociateTo; }
+        std::vector<Ast *> getParameterTy() const { return pTy; }
+        Ast * getResultType() const { return retype; }
+        Ast * getFuncBlock() const { return Block; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeFNStm; }
     };
 
@@ -572,16 +648,18 @@ namespace ast{
     class ReturnStmt: public Ast {
         private:
         tokt tok;
-        AstPtr val;
+        Ast * val;
 
         public:
-        ReturnStmt(tokt &_tok, AstPtr &_val)
+        ReturnStmt(tokt &_tok, Ast * &_val)
         : tok(_tok), val(_val) {}
 
+        static ReturnStmt *Create(tokt &_tok, Ast * &_val);
         tokt token() const { return tok; }
-        AstPtr getRetValue() const { return val; }
+        Ast * getRetValue() const { return val; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeRetStm; }
     };
 
@@ -589,19 +667,21 @@ namespace ast{
     class FunctionCall: public Ast {
         private:
         tokt tok;
-        AstPtr name;
-        std::vector<AstPtr> args;
+        Ast * name;
+        std::vector<Ast *> args;
 
         public:
-        FunctionCall(tokt &_tok, AstPtr &_name, std::vector<AstPtr> &_args)
+        FunctionCall(tokt &_tok, Ast * &_name, std::vector<Ast *> &_args)
         : tok(_tok), name(_name), args(_args) {}
 
 
+        static FunctionCall *Create(tokt &_tok, Ast *_name, std::vector<Ast *>&_args);
         tokt token() const { return tok; }
-        AstPtr getCalle() const { return name; }
-        std::vector<AstPtr> getArgs() const { return args; }
+        Ast * getCalle() const { return name; }
+        std::vector<Ast *> getArgs() const { return args; }
         std::string toString() const;
-        void accept(AstVisitor& visitor) const;
+        bool accept(AstVisitor& visitor) const;
+        
         NodeCategory nodeCategory() const { return NodeCallExpr; }
     };
 

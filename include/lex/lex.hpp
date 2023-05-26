@@ -35,6 +35,7 @@ namespace lex
         IF,
         ELSE,
         STRUCT,
+        METHOD,
         ENUM,
         BOOL,
         I8,
@@ -125,7 +126,21 @@ namespace lex
 
     bool tokenizer(const std::string &src, tok_t &toks, int begin, int end);
     
-    
+    // class Lexeme{
+    // private:
+    //     std::vector 
+    // };
+
+    class Lex{
+    private:
+        tokt data;
+    public:
+        Lex();
+        ~Lex();
+
+        bool tokenizer(const std::string &src, tok_t &toks, int begin, int end);
+        Lex* get();
+    };
 }
 
 

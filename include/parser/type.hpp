@@ -17,72 +17,64 @@ const enum KindType {
     TypeArray,
     TypeConst,
     TypeFunction,
-    TypeImport,
     TypeEnum,
+    TypeRef
 };
 
-class Val{
-    
-};
 
 
 class Type{
+protected:
+    bool IsConst;
+    bool HasRefOrAndOp;
 public:
  virtual ~Type() = default;
- virtual TypePtr OperationFinalOutput(lex::Token_type op, const TypePtr type) const;
+ virtual Type* OperationFinalOutput(lex::Token_type op, const Type* type) const;
  virtual bool UnaryOpMatch(lex::Token_type op);
- virtual bool Match(TypePtr ty);
- virtual bool TypeCastTo();
+ virtual bool IsCastRequire(Type *tofrom);
+ virtual bool IsCastable(Type *tofrom);
+ virtual bool IsValidOperation(Token_type op, Type* Ty);
  virtual KindType type() const = 0;
+ inline bool isConst() const { return IsConst; }
+ inline void setConst(bool _isConst) { IsConst = _isConst; }
 };
 
-using TypePtr = std::shared_ptr<Type>;
 
-class Int: public Type{
+class IntType: public Type{
 private:
-    // Token_type tok;
-    // int size;
+    uint16_t bit;
     bool isSign;
 public:
-    Int(bool isSign)
-    :isSign(isSign){}
+    IntType(uint16_t &_bit, bool &isSign)
+    :bit(_bit), isSign(isSign){}
 
     bool isSignInt() const {return isSign;}
-    // int size() const {return size;}    
-    TypePtr OperationFinalOutput(lex::Token_type op, const TypePtr type);
-    bool Match(TypePtr ty);
-    bool TypeCastTo();
+    int getbit() const {return bit;}    
+    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
     bool UnaryOpMatch(lex::Token_type op);
     KindType type() const { return TypeInt; }
 };
 
-class String: public Type{
-    bool ischar;
-public:
-    String();
-};
 
-class Float: public Type {
+
+class FloatType: public Type {
 private:
-    int size;
+    uint16_t bit;
 public:
-    Float(int size)
-    :size(size) {}
-    int size() const {return size;}
-    bool Match(TypePtr ty);
-    TypePtr OperationFinalOutput(lex::Token_type op, const TypePtr type);
+    FloatType(uint16_t &_bit)
+    :bit(_bit) {}
+    int getbit() const {return bit;}
+    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
     bool UnaryOpMatch(lex::Token_type op);
-    bool TypeCastTo();
     KindType type() const { return TypeDecimal; }
 
 };
 
-class Bool: public Type {
+class BoolType: public Type {
 private:
 
 public:
-    TypePtr OperationFinalOutput(lex::Token_type op, const TypePtr type);
-    bool Match(TypePtr ty);
+    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
     bool UnaryOpMatch(lex::Token_type op);
     KindType type() const { return TypeBoolean; }
 
@@ -90,14 +82,14 @@ public:
 
 // class ConstType: public Type {
 // private:
-//     TypePtr type;
+//     Type* type;
 
 // public:
-//     ConstType(TypePtr&_type)
+//     ConstType(Type*&_type)
 //     :type(_type) {}
 
-//     TypePtr consType() const {return type;}
-//     TypePtr OperationFinalOutput(lex::Token_type op, const TypePtr type);
+//     Type* consType() const {return type;}
+//     Type* OperationFinalOutput(lex::Token_type op, const Type* type);
 //     bool UnaryOpMatch(lex::Token_type op);
 //     KindType type() const { return TYPE_CONST; }
 
@@ -107,24 +99,23 @@ public:
 class EnumType: public Type {
     private:
     std::vector<std::string>uData;
-    std::vector<TypePtr>uVal;
+    std::vector<Type*>uVal;
     public:
-    EnumType(std::vector<std::string>&_uData, std::vector<TypePtr>&_uVal)
+    EnumType(std::vector<std::string>&_uData, std::vector<Type*>&_uVal)
     :uData(_uData), uVal(_uVal) {}
 };
 
 class FunctionType: public Type {
 private:
-    std::vector<TypePtr>param;
-    TypePtr retype;
+    std::vector<Type*>param;
+    Type* retype;
 public:
-    FunctionType(std::vector<TypePtr>&_param, TypePtr &_ret)
+    FunctionType(std::vector<Type*>&_param, Type* &_ret)
     :param(_param), retype(_ret) {}
 
-    std::vector<TypePtr>getParamTypes() const { return param; }
-    TypePtr getRetType() const { return retype; }
-    bool Match(TypePtr ty);
-    TypePtr OperationFinalOutput(lex::Token_type op, const TypePtr type);
+    std::vector<Type*>getParamTypes() const { return param; }
+    Type* getRetType() const { return retype; }
+    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
     bool UnaryOpMatch(lex::Token_type op);
     KindType type() const { return TypeFunction; }
 
@@ -132,57 +123,58 @@ public:
 
 class StructType: public Type{
 private:
-    std::vector<std::string>Name;
-    std::vector<TypePtr>Type;
+    std::map<std::string, Type*>EleNameTypeList;
+    std::vector<std::string>NameList;
+    std::vector<Type*>TypeList;
     std::vector<tokt>Temp;
+    std::map<std::string,Type*>Impl;
 public:
-    StructType(std::vector<std::string>&_Name, 
-                std::vector<TypePtr>&_Type, std::vector<tokt>&_Temp) 
-    :Name(_Name), Type(_Type), Temp(_Temp) {}
+    StructType(std::map<std::string, Type*>&_EleNameTypeList, std::vector<tokt>&_Temp) 
+    :EleNameTypeList(_EleNameTypeList), Temp(_Temp) {}
 
-    //std::string eleName() const {return name;}
-    std::vector<std::string>getNameList() const {return Name;}
-    std::vector<std::string>getTypeList() const {return Name;}
-    TypePtr getTypeAt(int i) const {
-        if(i < Type.size()){
-            return Type[i];
+    std::map<std::string, Type*>getNameTypeList() const {return EleNameTypeList;}
+    std::vector<std::string>getNameList() const { return NameList; }
+    std::vector<Type*>getTypeList() const { return TypeList; }
+    Type* getTypeAt(int i) const;
+
+    int find(std::string n) const;
+
+    Type* getTypeAt(std::string n) const;
+    Type* getType(std::string n) const;
+
+    void setImpl(std::map<std::string,Type*> &_Impl) { Impl = _Impl; }
+    bool HasImpl() const {
+        if(Impl.empty()) {
+            return false;
         }
+        return true; 
     }
-
-    int find(std::string n) const {
-        for(int i = 0, siz = Name.size(); i < siz; i++) {
-            if(Name[i] == n) {
-                return i;
-            }
+    std::map<std::string,Type*> getImpl() const { 
+        if(!HasImpl()) {
+            return {};
         }
-        return -1;
+        return Impl; 
     }
-
-    TypePtr getTypeAt(std::string n) const {
-        int i = find(n);
-        if(i == -1){
-            return Type[i];
-        }
-        return nullptr;
+    Type* getImpl(std::string &n) { 
+        return Impl.find(n) == Impl.end()? nullptr: Impl[n]; 
     }
-
     std::vector<tokt> getTemp() const {return Temp;}
     bool HasTemp() const {return !Temp.empty();}
-    TypePtr OperationFinalOutput(lex::Token_type op, const TypePtr type);
+    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
     bool UnaryOpMatch(lex::Token_type op);
     KindType type() const { return TypeStruct; }
 };
 
+
 class ArrayType: public Type{
 private:
-    TypePtr base;
-    int _size;
-    std::vector<int>size;
+    Type* base;
+    int Dim;
 public:
-    TypePtr getArrType() const { return base; }
-    std::vector<int> getArrSize() const { return size; }
-    TypePtr OperationFinalOutput(lex::Token_type op, const TypePtr type);
-    bool Match(TypePtr ty);
+    Type* getArrType() const { return base; }
+    // std::vector<int> getArrSize() const { return size; }
+    int getArrSize() const { return Dim; }
+    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
     bool UnaryOpMatch(lex::Token_type op);
     KindType type() const { return TypeArray; }
 };
@@ -191,36 +183,42 @@ public:
 class PointerType: public Type{
 private:
     int size;
-    TypePtr base;
+    Type* base;
 public:
-    PointerType(TypePtr &_base)
+    PointerType(Type* &_base)
     :base(_base) {}
 
-    TypePtr getBaseType() const {return base;}
+    Type* getBaseType() const {return base;}
     int getDefCount() const { return size; }
     KindType type() const { return TypePointer; }
-    bool Match(TypePtr ty);
     bool UnaryOpMatch(lex::Token_type op);
-    // KindType base_type() const { reTYPE_turn base->type(); }
-    TypePtr OperationFinalOutput(lex::Token_type op, const TypePtr type);
-
-
+    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
 };
 
+class RefType: public Type{
+private:
+    Type* base;
+public:
+    RefType(Type* &_base)
+    :base(_base) {}
+
+    Type* getBaseType() const {return base;}
+    KindType type() const { return TypeRef; }
+    bool UnaryOpMatch(lex::Token_type op);
+    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
+};
 
 class TypeGenerator{
     public:
-    static TypePtr Integer();
-    static TypePtr Boolean();
-    static TypePtr Decimal();
-    static TypePtr String(Token_type tok);
-    static TypePtr TupleTyGen(std::map<int,TypePtr>&ty);
-    static TypePtr ArrayTyGen(TypePtr &base, int size);
-    static TypePtr PointerTyGen(int count,TypePtr base);
-    static TypePtr StructTyGen(std::map<std::string, TypePtr>&_ele);
-    static TypePtr FuncTyGen(std::vector<TypePtr>&p_type, TypePtr r_type);
-    static TypePtr EnumTyGen(std::vector<std::string>&uData, std::vector<TypePtr>&type);
-    static TypePtr Generate(KindType type);
+    static IntType* GenerateIntType(uint16_t bit,bool isSign);
+    static BoolType* GenerateBoolType();
+    static FloatType* GenerateFltType(uint16_t bit);
+    static ArrayType* GenerateArrType(Type* &base, int size);
+    static PointerType* GeneratePtrType(int count,Type* base);
+    static StructType* GenerateStructType(std::vector<std::string>&str, std::vector<Type*>&ty,std::vector<lex::tokt>&temp);
+    static FunctionType* GenerateFuncType(std::vector<Type*>&p_type, Type* r_type);
+    static EnumType* GenerateEnumType(std::vector<std::string>&uData, std::vector<Type*>&type);
+    static RefType* GenerateRefType(Type*&ty);
 };
 
 }

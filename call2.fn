@@ -1,17 +1,18 @@
 
-let io = #import();
+#import
 
-let vector := struct<T>{
-        a:*type,
-        b:*T 
-};
 
 struct vector<T>{
 a:*type,
 b:*T
 };
 
-let write is extern[];
+impl vector<T> {
+    fn new(t:type) -> {
+        
+    }
+}
+
 extern["stdio.h"] fn write();
 extern["stdio.h"] call:i32;
 

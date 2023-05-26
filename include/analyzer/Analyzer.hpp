@@ -1,49 +1,84 @@
 #pragma once
+#include"AstVisitor.hpp"
+#include"../parser/type.hpp"
+#include"symbol_table.hpp"
+#include"Value.hpp"
+// #include"analyzer/AstVisitor.hpp"
+// #include"parser/type.hpp"
+// #include"analyzer/symbol_table.hpp"
 
-#include<iostream>
-#include"analyzer/AstVisitor.hpp"
-namespace analyzer{
 using namespace ast;
-class AstAnalyzer: public AstVisitor {
-    private:
-    bool mainFunc = false;
-    bool checkType(ast::NodeCategory node);
-    bool visit(const Program& astnode);
-    bool visit(const BlockStatement& astnode );
-    bool visit(const FunctionDef& astnode );
-    bool visit(const ForInLoop& astnode );
-    bool visit(const WhileLoop& astnode );
-    bool visit(const StructStmt& astnode );
-    bool visit(const BranchStmt& astnode );
-    bool visit(const VarStmt& astnode );
-    bool visit(const IfStatement& astnode );
-    bool visit(const ReturnStmt& astnode );
+namespace analyzer{
 
-    bool visit(const BineryExpr& astnode );
-    bool visit(const AssignmentExpr& astnode );
-    bool visit(const ListExpr& astnode ) ;
-    bool visit(const FunctionCall& astnode );
-    bool visit(const MemberExpr& astnode );
-    bool visit(const IndexExpr& astnode );
-    bool visit(const PrefixExper& astnode );
-    bool visit(const Parameter& astnode );
+class Symbol{
+private:
+    Type *type;
+    ast::VALUE *value;
+public:
+    Symbol(Type *&_type, ast::VALUE *&_value)
+    :type(_type), value(_value) {}
 
-    bool visit(const PointerExpr& astnode );
-    bool visit(const ArrayType& astnode ) ;
-    bool visit(const Tuple& astnode ) ;
-    bool visit(const PreDefineType& astnode );
-    bool visit(const Identifier& astnode );
-
-    bool visit(const FloatLiteral& astnode );
-    bool visit(const BoolLiteral& astnode );
-    bool visit(const NumericLiteral& astnode );
-    bool visit(const NullLiteral& astnode );
-    bool visit(const StringLiteral& astnode );
-
-// bool visit(const TypeState& astnode );
-// bool visit(const EnumLitral& astnode );
-// bool visit(const NewState& astnode );
-// bool visit(const FreeState& astnode );
 };
 
+// class Stack{
+// private:
+//     std::vector<std::string>VarId;
+//     std::vector<Symbol*>Layer;
+// public:
+//     Stack();
+
+//     void PushLayer(Symbol *&sym);
+//     void PopLayer(Symbol *&sym);
+// };
+
+class Stack{
+private:
+    std::vector<std::string>VarId;
+    std::vector<AstPtr>Stmt;
+public:
+    Stack();
+
+    void PushStmt(Symbol *&sym);
+    void PopStmt(Symbol *&sym);
+};
+
+class StaticAnalyzer: public AstVisitor {
+private:
+    Stack *StmtStack;
+    
+    bool visit(BlockStmt &AstNode );
+    bool visit(FunctionDef& AstNode );
+    bool visit(WhileLoop& AstNode );
+    bool visit(ForLoop& AstNode );
+    bool visit(StructStmt& AstNode );
+    bool visit(EnumExpr &AstNode );
+    bool visit(BranchStmt& AstNode );
+    bool visit(VarStmt& AstNode );
+    bool visit(IfStmt& AstNode );
+    bool visit(ReturnStmt& AstNode );
+    
+    bool visit(GroupedExpr& AstNode );
+    bool visit(Expression& AstNode );
+    bool visit(ListExpr& AstNode ) ;
+    bool visit(FunctionCall& AstNode );
+    bool visit(PostfixExpr& AstNode );
+    bool visit(PrefixExpr& AstNode );
+
+    bool visit(Array& AstNode ) ;
+    bool visit(PreDefineType& AstNode );
+    bool visit(Identifier& AstNode );
+
+    bool visit(FloatLiteral& AstNode );
+    bool visit(BoolLiteral& AstNode );
+    bool visit(NumericLiteral& AstNode );
+    bool visit(NullLiteral& AstNode );
+    bool visit(StringLiteral& AstNode );
+public:
+    StaticAnalyzer();
+};
+
+
+
 }
+
+

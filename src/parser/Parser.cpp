@@ -1,143 +1,195 @@
 
 #include"../../include/parser/Parser.hpp"
+#include"../../include/parser/Ast.hpp"
 #include"../../include/Error.hpp"
 // #include"parser/Parser.hpp"
 // #include"Error.hpp"
 
 namespace parser
 {
+using namespace ast;
 
-AstPtr Parser::parse() {
-    bool isBrace = false;
-    if(!ParseBlock(isBrace)) {
-        return nullptr;
-    }
-    return ResultantNode;
-}
 
-bool Parser::ParseBlock(bool isBrace){
-    std::vector<AstPtr>stmts;
-    if(isBrace&&!checkn(LBRACE)){
-        err::out("expected '{' found",toks[CurrentIndex]);
+bool Parser::ParseBlock(ParserHelper &P, Ast *&ResultantNode, bool isBrace){
+    std::vector<Ast*>stmts;
+    if(isBrace&&!P.checkn(LBRACE)){
+        err::out("expected '{' found",P.toks[P.CurrentIndex]);
         return false;
     }
-    while(!check(FEOF)&&(!isBrace&&!check(RBRACE))) {
+    while(!P.check(FEOF)&&(!isBrace&&!P.check(RBRACE))) {
         bool isSemiCol = false;
-        switch(CurrentToken){ 
+        switch(P.CurrentToken){ 
         case IF:
-            if(!ParseIfStmt()){ return false; }
+            if(!ParseIfStmt(P, ResultantNode)){ return false; }
             break;
         case FOR:
-            if(checkNH(IN, 2)){
-                if(!ParseForInStmt()){ return false; }
+            if(P.checkNH(IN, 2)){
+                if(!ParseForInStmt(P, ResultantNode)){ return false; }
             }else{
-                if(!ParseForStmt()){ return false; }
+                if(!ParseForStmt(P, ResultantNode)){ return false; }
             }
             break;
         case FN:
         {
-            if(!ParseFuncDef()){
+            if(!ParseFuncDef(P, ResultantNode)){
+                return false;
+            }
+        }
+            break;
+        case STRUCT:
+        {
+            if(!ParseStructStmt(P, ResultantNode)){
+                return false;
+            }
+        }
+            break;
+        case METHOD:
+        {
+            if(!ParseMethod(P, ResultantNode)){
+                return false;
+            }
+        }
+            break;
+        case ENUM:
+        {
+            if(!ParseEnumStmt(P, ResultantNode)){
                 return false;
             }
         }
             break;
         case WHILE:
-            if(!ParseWhileStmt()){ return false;}
+            if(!ParseWhileStmt(P, ResultantNode)){ return false;}
             break;
         case LET:
-            if(!ParseVarStmt()){ return false; }
+            if(!ParseVarStmt(P, ResultantNode)){ return false; }
             isSemiCol = true;
             break;
 
         case RETURN:
-            if(!ParseReturnStmt()){ return false; }
+            if(!ParseReturnStmt(P, ResultantNode)){ return false; }
             isSemiCol = true;
             break;
 
         case CONTINUE:
         case BREAK:
-            stmts.push_back(std::make_shared<BranchStmt>(toks[CurrentIndex]));
-            next();
+            stmts.push_back(BranchStmt::Create(P.toks[P.CurrentIndex]));
+            P.next();
             isSemiCol = true;
             break;
         case TYPE:
-            if(!ParseTypeStatm()){ return false; }
+            if(!ParseTypeStatm(P, ResultantNode)){ return false; }
             isSemiCol = true;
             break;
         case IDEN:
-            if(!ParseExpr()) { return false;}
+            if(!ParseExpr(P, ResultantNode)) { return false;}
             isSemiCol = true;
             break;
         default:
             
             break;
         }
-        if(isSemiCol&&!checkn(SCOL)){
-            err::out("expected ';' found - ",toks[CurrentIndex]);
+        if(isSemiCol&&!P.checkn(SCOL)){
+            err::out("expected ';' found - ",P.toks[P.CurrentIndex]);
             return false;
         }
         stmts.push_back(ResultantNode);
     }
-    if(isBrace&&!checkn(RBRACE)){
-        err::out("expected '}' found",toks[CurrentIndex]);
+    if(isBrace&&!P.checkn(RBRACE)){
+        err::out("expected '}' found",P.toks[P.CurrentIndex]);
         return false;
     }
-    ResultantNode = std::make_shared<BlockStatement>(stmts);
+    ResultantNode = BlockStmt::Create(stmts);
     return true;
 }
 
-bool Parser::ParseWhileStmt() {
-    tokt tok = toks[CurrentIndex];
-    AstPtr Cond;
-    next();
-    if(check(LBRACE)){
-        err::out("expected condition expression found - ",toks[CurrentIndex]);
+
+bool Parser::ParseMethod(ParserHelper &P, Ast *&ResultantNode) {
+    tokt tok = P.toks[P.CurrentIndex];
+    Ast* Assoc;
+    std::vector<Ast*> Impl;
+    P.next();
+    if(!P.check(IDEN)){
+        err::out("expected 'identifier' with method statement found - ",P.toks[P.CurrentIndex]);
         return false;
     }
-    if(!ParseExpr()) {
+    tokt Name = P.toks[P.CurrentIndex];
+    P.next();
+    if(P.check(FOR)){
+        ///@todo
+    }
+    if(!P.checkn(LBRACE)) {
+        err::out("expected '{' found - ",P.toks[P.CurrentIndex]);
+        return false;
+    }
+
+    while(!P.check(FN)) {
+        if(!ParseFuncDef(P, ResultantNode)) {
+            return false;
+        }
+        Impl.push_back(ResultantNode);
+    }
+
+    if(!P.checkn(RBRACE)) {
+        err::out("expected '}' found - ",P.toks[P.CurrentIndex]);
+        return false;
+    }
+    ResultantNode = Method::Create(tok, Name, Assoc, Impl);
+    return true;
+}
+
+
+bool Parser::ParseWhileStmt(ParserHelper &P, Ast *&ResultantNode) {
+    tokt tok = P.toks[P.CurrentIndex];
+    Ast* Cond;
+    P.next();
+    if(P.check(LBRACE)){
+        err::out("expected condition expression found - ",P.toks[P.CurrentIndex]);
+        return false;
+    }
+    if(!ParseExpr(P, ResultantNode)) {
         return false;
     }
     Cond = ResultantNode;
     bool isBrace = true;
-    if(!ParseBlock(isBrace)){
+    if(!ParseBlock(P,ResultantNode,isBrace)){
         return false;
     }
-    ResultantNode = std::make_shared<WhileLoop>(tok,Cond,ResultantNode);
+    ResultantNode = WhileLoop::Create(tok,Cond,ResultantNode);
     return true;
 }
 
 
-bool Parser::ParseReturnStmt() {
-    dump(__func__);
-    tokt tok = toks[CurrentIndex];
-    AstPtr val;
-    next();
+bool Parser::ParseReturnStmt(ParserHelper &P, Ast *&ResultantNode) {
+    P.dump(__func__);
+    tokt tok = P.toks[P.CurrentIndex];
+    Ast* val;
+    P.next();
 
-    if(!check(SCOL)){
-        if(!ParseExpr()) {
+    if(!P.check(SCOL)){
+        if(!ParseExpr(P, ResultantNode)) {
             return false;
         }
         val = ResultantNode;
     }
-    if(!checkn(SCOL)){
-            err::out("expected ';' found -> ",toks[CurrentIndex]);
+    if(!P.checkn(SCOL)){
+            err::out("expected ';' found -> ",P.toks[P.CurrentIndex]);
             return false;
     }
 
-    next();
-    ResultantNode = std::make_shared<ReturnStmt>(tok, val);
-    dump2(__func__);
+    P.next();
+    ResultantNode = ReturnStmt::Create(tok, val);
+    P.dump2(__func__);
 
     return true;
 }
 
 
-bool Parser::ParseType() {
-    //AstPtr type;
-    dump(__func__);
-    switch(CurrentToken){
+bool Parser::ParseType(ParserHelper &P, Ast *&ResultantNode) {
+    //Ast* type;
+    P.dump(__func__);
+    switch(P.CurrentToken){
         case LBRACK:
-            if(!ParseArrayType()){
+            if(!ParseArrayType(P,ResultantNode)){
                 return false;
             }
             break;
@@ -152,152 +204,156 @@ bool Parser::ParseType() {
         case F32:
         case F64:
         case BOOL:
-            ResultantNode = std::make_shared<PreDefineType>(toks[CurrentIndex]);
-            next();
+            ResultantNode = PreDefineType::Create(P.toks[P.CurrentIndex]);
+            P.next();
             break;
         case CONST:
         {
-            tokt tok = toks[CurrentIndex];
-            Token_type Op = CurrentToken;
+            tokt tok = P.toks[P.CurrentIndex];
+            Token_type Op = P.CurrentToken;
             bool isType = true;
-            next();
-            if(!ParseType()){
+            P.next();
+            if(!ParseType(P,ResultantNode)){
                 return false;
             }
-            ResultantNode = std::make_shared<PrefixExpr>(tok,Op,ResultantNode,isType, NodeConstTy);
+            ResultantNode = PrefixExpr::Create(tok,Op,ResultantNode,isType,0, NodeConstTy);
 
         }
             break;
         case FN:
         {
-            tokt tok = toks[CurrentIndex];
-            next();
-            if(!check(LPAREN)){
-                err::out("expected '{' found -> ",toks[CurrentIndex]);
+            tokt tok = P.toks[P.CurrentIndex];
+            P.next();
+            if(!P.check(LPAREN)){
+                err::out("expected '{' found -> ",P.toks[P.CurrentIndex]);
                 return false;
             }else{
-                next();
-                std::vector<AstPtr>ty;
-                while(!check(RPAREN)){
-                    if(!ParseType()) {
+                P.next();
+                std::vector<Ast*>ty;
+                while(!P.check(RPAREN)){
+                    if(!ParseType(P,ResultantNode)) {
                         return false;
                     }
                     ty.push_back(ResultantNode);
-                    if(checkn(COMMA)) {
+                    if(P.checkn(COMMA)) {
                         break;
                     }
                 }
-                if(!checkn(RPAREN)) {
-                    err::out("expected ')' found -> ",toks[CurrentIndex]);
+                if(!P.checkn(RPAREN)) {
+                    err::out("expected ')' found -> ",P.toks[P.CurrentIndex]);
                     return false;
                 }
-                AstPtr ret;
-                if(checkn(ARROW)){
-                    if(ParseType()){
+                Ast* ret;
+                if(P.checkn(ARROW)){
+                    if(ParseType(P, ResultantNode)){
                         ret = ResultantNode;
                     }
                 }
-                ResultantNode = std::make_shared<FunType>(tok, ty, ret);
+                ResultantNode = FnType::Create(tok, ty, ret);
 
             }
         }
             break;
         case IDEN:
-            if(!ParseSpecificType()){
+            if(!ParseSpecificType(P,ResultantNode)){
                 return false;
             }
             break;
         case STAR:
         {
             bool isType  = true;
-            tokt tok  = toks[CurrentIndex];
-            Token_type op = CurrentToken;
-            next();
-            if(!ParseType()){
+            tokt tok  = P.toks[P.CurrentIndex];
+            Token_type op = P.CurrentToken;
+            int DefCount = 0;
+            P.next();
+            while(P.checkn(STAR)){
+                DefCount++;
+            }
+            if(!ParseType(P,ResultantNode)){
                 return false;
             }
-            ResultantNode = std::make_shared<PrefixExpr>(tok,op,ResultantNode,isType,NodePtr);
+            ResultantNode = PrefixExpr::Create(tok,op,ResultantNode,isType,DefCount,NodePtr);
         }
             break;
         case SELF:
         {   
-            if(!ParseIdentifier()) {
+            if(!ParseIdentifier(P,ResultantNode)) {
                 return false;
             }
         }
         break;
         default:
-            err::out("expected 'type' found ->",toks[CurrentIndex]);
+            err::out("expected 'type' found ->",P.toks[P.CurrentIndex]);
             return false;
     }
-            dump2(__func__);
+            P.dump2(__func__);
     return true;
 }
 
 
-bool Parser::ParseArrayType() {
-    tokt tok = toks[CurrentIndex];
-    std::vector<AstPtr>size;
-    next();
-    if(check(RBRACK)) {
-        err::out("expected ']' found ->",toks[CurrentIndex]);
+bool Parser::ParseArrayType(ParserHelper &P, Ast *&ResultantNode) {
+    tokt tok = P.toks[P.CurrentIndex];
+    std::vector<Ast*>size;
+    P.next();
+    if(P.check(RBRACK)) {
+        err::out("expected ']' found ->",P.toks[P.CurrentIndex]);
         return false;
     }
-    while(check(RBRACK)) {
-        if(!ParseExpr()) {
+    while(P.check(RBRACK)) {
+        if(!ParseExpr(P, ResultantNode)) {
             return false;
         }
         size.push_back(ResultantNode);
-        if(!check(SCOL)) {
+        if(!P.check(SCOL)) {
             break;
         }
     }
-    if(!checkn(RBRACK)) {
-        err::out("expected ']' found ->",toks[CurrentIndex]);
+    if(!P.checkn(RBRACK)) {
+        err::out("expected ']' found ->",P.toks[P.CurrentIndex]);
         return false;
     }
-    if(!ParseType()){
+    if(!ParseType(P,ResultantNode)){
         return false;
     }
-    ResultantNode = std::make_shared<ArrayTy>(tok,size,ResultantNode);
+    ResultantNode = Array::Create(tok,size,ResultantNode);
     return true;
 }
 
 
-bool Parser::ParseTypeStatm(){
-    tokt tok = toks[CurrentIndex];
-    next();
-    if(!check(IDEN)){
-        err::out("expected 'identifier' found - ",toks[CurrentIndex]);
+bool Parser::ParseTypeStatm(ParserHelper &P, Ast *&ResultantNode){
+    tokt tok = P.toks[P.CurrentIndex];
+    P.next();
+    if(!P.check(IDEN)){
+        err::out("expected 'identifier' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
-    tokt Ident = toks[CurrentIndex];
-    next();
-    if(!checkn(IS)){
-        err::out("expected 'is' found - ",toks[CurrentIndex]);
+    tokt Ident = P.toks[P.CurrentIndex];
+    P.next();
+    if(!P.checkn(ASSN)){
+        err::out("expected '=' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
 
-    if(!ParseType()){
+    if(!ParseType(P,ResultantNode)){
         return false;
     }
-    ResultantNode = std::make_shared<TypeStmt>(tok, Ident, ResultantNode);
+    ResultantNode = TypeStmt::Create(tok, Ident, ResultantNode);
     return true;
 }
 
 
-bool Parser::ParseCall() {
-    tokt tok = toks[CurrentIndex];
-    AstPtr sig = ResultantNode;
-    std::vector<AstPtr>args;
+bool Parser::ParseCall(ParserHelper &P, Ast *&ResultantNode) {
+    tokt tok = P.toks[P.CurrentIndex];
+    Ast* sig = ResultantNode;
+    std::vector<Ast*>args;
 
-    if(!checkn(LPAREN)){
-        err::out("expected '(' found - ", toks[CurrentIndex]);
+    if(!P.checkn(LPAREN)){
+        err::out("expected '(' found - ", P.toks[P.CurrentIndex]);
         return false;
     }
 
-    while(!check(FEOF)){
-        if(!ParseExpr()) {
+    while(!P.check(FEOF)){
+        if(!ParseExpr(P, ResultantNode)) {
             return false;
         }
 
@@ -306,230 +362,275 @@ bool Parser::ParseCall() {
             return false;
         }
 
-        if(!checkn(COMMA)) {
+        if(!P.checkn(COMMA)) {
             break;
         }
     }
 
-    if(!checkn(RPAREN)){
-        err::out("expected ')' found - ", toks[CurrentIndex]);
+    if(!P.checkn(RPAREN)){
+        err::out("expected ')' found - ", P.toks[P.CurrentIndex]);
         return false;
     }
-    ResultantNode = std::make_shared<FunctionCall>(tok,sig,args);
+    ResultantNode = FunctionCall::Create(tok,sig,args);
     return true;
 }
 
 
-bool Parser::ParseListExpr() {
-    tokt tok = toks[CurrentIndex];
-    next();
-    std::vector<AstPtr>List;
-    while(!check(RBRACK)) {
-        if(!ParseExpr()){
+bool Parser::ParseListExpr(ParserHelper &P, Ast *&ResultantNode) {
+    tokt tok = P.toks[P.CurrentIndex];
+    P.next();
+    std::vector<Ast*>List;
+    while(!P.check(RBRACK)) {
+        if(!ParseExpr(P, ResultantNode)){
             return false;
         }
         List.push_back(ResultantNode);
-        if(!checkn(COMMA)){
+        if(!P.checkn(COMMA)){
             break;
         }
     }
-    if(!checkn(RBRACK)){
-        err::out("expected ']' found - ", toks[CurrentIndex]);
+    if(!P.checkn(RBRACK)){
+        err::out("expected ']' found - ", P.toks[P.CurrentIndex]);
         return false;
     }
-    ResultantNode = std::make_shared<ListExpr>(tok, List);
+    ResultantNode = ListExpr::Create(tok, List);
     return true;
 }
 
 
-bool Parser::ParseCastExpr() {
-    AstPtr LHS = ResultantNode;
-    tokt tok = toks[CurrentIndex];
-    Token_type op = CurrentToken;
-    AstPtr RHS;
-    while(checkn(AS)){
-        if(!ParseType()){
+bool Parser::ParseCastExpr(ParserHelper &P, Ast *&ResultantNode) {
+    Ast* LHS = ResultantNode;
+    tokt tok = P.toks[P.CurrentIndex];
+    Token_type op = P.CurrentToken;
+    Ast* RHS;
+    while(P.checkn(AS)){
+        if(!ParseType(P,ResultantNode)){
             return false;
         }
-        ResultantNode = std::make_shared<Expression>(tok,LHS,op,RHS,NodeAsExpr);
+        ResultantNode = Expression::Create(LHS,op,RHS,NodeAsExpr);
     }
     return true;
 }
 
 
-bool Parser::ParsePrefixExpr(KindExpression Expr) {
-    tokt tok = toks[CurrentIndex];
-    Token_type op = CurrentToken;
+bool Parser::ParsePrefixExpr(ParserHelper &P, Ast *&ResultantNode, KindExpression Expr) {
+    tokt tok = P.toks[P.CurrentIndex];
+    Token_type op = P.CurrentToken;
     NodeCategory NodeKind;
+    bool isType = false;
     int DefCount = 0;
-    if(checkn(STAR)) {
+    if(P.checkn(STAR)) {
         DefCount = 0;
-        while(checkn(STAR)){
+        while(P.checkn(STAR)){
             DefCount++;
         }
-        if(check(AND_OP)){
-            if(!ParsePrefixExpr(Expr)){
+        if(P.check(AND_OP)){
+            if(!ParsePrefixExpr(P,ResultantNode,Expr)){
                 return false;
             }
-        }else if(check(IDEN)||check(LPAREN)){
-            if(!ParsePrePostExpr(Expr)){
+        }else if(P.check(IDEN) || P.check(LPAREN)){
+            if(!ParseExpr3(P,ResultantNode,Expr)){
                 return false;
             }
         }else {
-            err::out("invalid expression with operator - ", toks[CurrentIndex]);
+            err::out("invalid expression with operator - ", P.toks[P.CurrentIndex]);
             return false;
         }
         NodeKind = NodePtr;
-    }else if(checkn(AND_OP)) {
-        if(check(IDEN)||check(LPAREN)){
-            if(!ParsePrePostExpr(Expr)){
+    }else if(P.checkn(AND_OP)) {
+        if(P.check(IDEN)||P.check(LPAREN)){
+            if(!ParseExpr3(P,ResultantNode,Expr)){
                 return false;
             }
-        }else if(check(LBRACK)) {
-            if(!ParseListExpr()){
+        }else if(P.check(LBRACK)) {
+            if(!ParseListExpr(P,ResultantNode)){
                 return false;
             }
         }else {
-            err::out("invalid expression with operator - ", toks[CurrentIndex]);
+            err::out("invalid expression with operator - ", P.toks[P.CurrentIndex]);
             return false;
         }
         NodeKind - NodeRef;
-    }else if(checkn(PLUS)||checkn(MINUS)||checkn(NOT)||checkn(NOT_OP)) {
-        if(!check(IDEN)&&!check(LPAREN)&&!isLiteral(CurrentToken)){
-            err::out("invalid expression with operator - ", toks[CurrentIndex]);
+    }else if(P.checkn(PLUS)||P.checkn(MINUS)||P.checkn(NOT)||P.checkn(NOT_OP)) {
+        if(!P.check(IDEN)&&!P.check(LPAREN)&&!P.isLiteral(P.CurrentToken)){
+            err::out("invalid expression with operator - ", P.toks[P.CurrentIndex]);
             return false;
         }
-        if(!ParseExpr()){
+        if(!ParseExpr(P, ResultantNode)){
             return false;
         }
         NodeKind = NodePrefix;
     }
-    
-    ResultantNode = std::make_shared<PrefixExpr>(tok,op,ResultantNode,NodeKind);
+    ResultantNode = PrefixExpr::Create(tok,op,ResultantNode, isType, DefCount, NodeKind);
     return true;
 }
 
-bool Parser::ParseExpr() {
+bool Parser::ParseExpr(ParserHelper &P, Ast *&ResultantNode) {
     int Precedance = 0;
-    if(!ParseExpr2(Precedance)){
+    if(!ParseExpr1(P,ResultantNode,Precedance)){
         return false;
     }
     return 0;
 }
- 
 
-bool Parser::ParseExpr2(int &Precedance) {
+
+
+
+
+
+
+
+bool Parser::ParseExpr1(ParserHelper &P, Ast *&ResultantNode, int Precedance) { 
     KindExpression Expr;
-    if(!ParseExpression(Precedance, Expr)){
+    if(!ParseExpr2(P, ResultantNode, Expr)){
         return false;
     }
-
-    if(check(AS)) {
+    if(P.ArithmeticOP(P.CurrentToken)) {
         if(Expr == KExpr_ArrayInit || Expr == KExpr_StructInit || Expr == KExpr_DotDot){
-            err::out("Arithmetic operation not allowed with - ",toks[CurrentIndex]);
+            err::out("Arithmetic operation not allowed with - ",P.toks[P.CurrentIndex]);
             return false;
         }
-        if(ParseCastExpr()) {
+        if(!ParseBinaryExpr(P,ResultantNode,Precedance)) {
             return false;
         }
-    }
-
-    if(ArithmeticOP(CurrentToken)) {
+    }else if(P.LogicalOP(P.CurrentToken)) {
         if(Expr == KExpr_ArrayInit || Expr == KExpr_StructInit || Expr == KExpr_DotDot){
-            err::out("Arithmetic operation not allowed with - ",toks[CurrentIndex]);
+            err::out("Logical operation not allowed with - ",P.toks[P.CurrentIndex]);
             return false;
         }
-        if(!ParseBinaryExpr(Precedance)) {
-            return false;
-        }
-    }else if(LogicalOP(CurrentToken)) {
-        if(Expr == KExpr_ArrayInit || Expr == KExpr_StructInit || Expr == KExpr_DotDot){
-            err::out("Logical operation not allowed with - ",toks[CurrentIndex]);
-            return false;
-        }
-        if(!ParseBinaryExpr(Precedance)) {
+        if(!ParseBinaryExpr(P,ResultantNode,Precedance)) {
             return false;
         }
 
-    }if(ConditionalOP(CurrentToken)) {
+    }if(P.ConditionalOP(P.CurrentToken)) {
         if(Expr == KExpr_ArrayInit || Expr == KExpr_StructInit || Expr == KExpr_DotDot){
-            err::out("Conditional operation not allowed with - ",toks[CurrentIndex]);
+            err::out("Conditional operation not allowed with - ",P.toks[P.CurrentIndex]);
             return false;
         }
-        if(!ParseBinaryExpr(Precedance)) {
+        if(!ParseBinaryExpr(P,ResultantNode,Precedance)) {
             return false;
         }
-    }else if(AssignOP(CurrentToken)) {
+    }else if(P.AssignOP(P.CurrentToken)) {
         if(Expr == KExpr_ArrayInit || Expr == KExpr_StructInit || Expr == KExpr_DotDot){
-            err::out("Assignment operation not allowed with - ",toks[CurrentIndex]);
+            err::out("Assignment operation not allowed with - ",P.toks[P.CurrentIndex]);
             return false;
         }
-        if(!ParseBinaryExpr(Precedance)) {
+        if(!ParseBinaryExpr(P,ResultantNode,Precedance)) {
             return false;
         }
     }
     return true;
 }
 
+bool Parser::ParseExpr2(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) { 
+    if(!ParseExpr3(P, ResultantNode, Expr)){
+        return false;
+    }
 
-bool Parser::ParseExpression(int &Precedance, KindExpression &Expr) {
-    switch (CurrentToken)
-    {
-    case SELF:
-    {
-        switch (checkh(CurrentToken))
-        {
-        case ARROW:
-        case DOT:
-        {
-            if(!ParsePrePostExpr(Expr)) {
-                return false;
-            }
+    if(P.check(AS)) {
+
+    }
+    
+    return true;
+}
+
+bool Parser::ParseExpr3(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) { 
+    if(P.check(STAR)) {
+
+    }else if(P.check(AND_OP)) {
+
+    }else if(P.check(PLUS)||P.check(MINUS)) {
+
+    }if(!ParseExpr3(P, ResultantNode, Expr)) {
+        return false;
+    }
+
+    return true;
+}
+
+
+
+
+
+
+bool Parser::ParseExpr4(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) {
+    if(!ParseExpr5(P,ResultantNode, Expr)){
+        return false;
+    }
+
+    if(P.check(DOT) || P.check(ARROW)){
+        if(Expr == KExpr_StructInit || Expr == KExpr_Literal ||
+            Expr == KExpr_ArrayInit || Expr == KExpr_DotDot || 
+            Expr == KExpr_Binary) {
+            err::out("Member Access operation not allowed with - ",P.toks[P.CurrentIndex]);
+            return false;
         }
-            break;
-        default:
-            if(!ParseIdentifier()){
-                return false;
-            }
-            Expr = KExpr_Self;
-            break;
+        if(!ParseDotArrowExpr(P, ResultantNode, Expr)) {
+            return false;
         }
     }
-        break;
-    case IDEN:
-        switch (checkh(CurrentToken))
-        {
-        case LPAREN:
-        case LBRACK:
-        case ARROW:
-        case DOT:
-        {
-            int OldPrecedance = Precedance;
-            Precedance = 0;
-            if(!ParsePrePostExpr(Expr)) {
-                return false;
-            }
-            Precedance = OldPrecedance;
-            break;
+ 
+    
+    return true;
+}
+
+bool Parser::ParseExpr5(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) {
+    if(!ParseExpression(P, ResultantNode, Expr)){
+        return false;
+    }
+
+    if(P.check(LPAREN) || P.check(LBRACK)){
+        if(Expr == KExpr_StructInit || Expr == KExpr_Literal ||
+            Expr == KExpr_ArrayInit || Expr == KExpr_DotDot || 
+            Expr == KExpr_Binary) {
+            err::out("Member Access operation not allowed with - ",P.toks[P.CurrentIndex]);
+            return false;
         }
+
+         while(!P.check(FEOF)&&(P.check(LBRACK)||P.check(LPAREN))){
+            if(P.check(LPAREN)) {
+                if(!ParseCall(P,ResultantNode)){
+                    return false;
+                }
+                Expr = KExpr_Call;
+            }else if(P.check(LBRACK)) {
+                if(!ParseArrayIndexExpr(P,ResultantNode)){
+                    return false;
+                }
+                Expr = KExpr_ArrayAccess;
+            }
+        }
+        
+    }
+ 
+    
+    return true;
+}
+
+bool Parser::ParseExpression(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) {
+    switch (P.CurrentToken)
+    {
+    case IDEN:
+        switch (P.checkh(P.CurrentToken))
+        {
         case DOTDOT:
         {
-            tokt tok = toks[CurrentIndex];
-            Token_type op = CurrentToken;
-            ResultantNode = std::make_shared<Expression>(tok, ResultantNode, op, nullptr, NodeDotDotExpr);
-            next();
+            tokt tok = P.toks[P.CurrentIndex];
+            Token_type op = P.CurrentToken;
+            ResultantNode = Expression::Create(ResultantNode, op, nullptr, NodeDotDotExpr);
+            P.next();
             Expr = KExpr_DotDot;
         }
         break;
         case LT:
         case LBRACE:
-            if(!ParseStructExpr()) {
+            if(!ParseStructExpr(P,ResultantNode)) {
                 return false;
             }
             Expr = KExpr_StructInit;
             break;
         default:
-            if(!ParseIdentifier()){
+            if(!ParseIdentifier(P,ResultantNode)){
                 return false;
             }
             Expr = KExpr_Identifier;
@@ -537,51 +638,55 @@ bool Parser::ParseExpression(int &Precedance, KindExpression &Expr) {
         }
         break;
     case LBRACK:
-        if(!ParseListExpr()) {
+        if(!ParseListExpr(P,ResultantNode)) {
                 return false;
         }
         Expr = KExpr_ArrayInit;
         break;
     case LPAREN:
     {
-        if(!ParsePrePostExpr(Expr)) {
+        if(!ParseParenExpr(P,ResultantNode, Expr)) {
             return false;
         }
         Expr = KExpr_Grouped;
     }   
     break;
-    case STAR:
-    case PLUS:
-    case AND_OP:
-    case MINUS:
-    case NOT:
-    case NOT_OP:
-        if(!ParsePrefixExpr(Expr)) {
-                return false;
-        }
-        break;
     case INT:
     {
-        ResultantNode = std::make_shared<NumericLiteral>(toks[CurrentIndex]);
-        next();
+        ResultantNode = NumericLiteral::Create(P.toks[P.CurrentIndex]);
+        P.next();
+        Expr = KExpr_Literal;
     }
+    break;
     case FLOAT:
     {
-        ResultantNode = std::make_shared<FloatLiteral>(toks[CurrentIndex]);
-        next();
+        ResultantNode = FloatLiteral::Create(P.toks[P.CurrentIndex]);
+        P.next();
+        Expr = KExpr_Literal;
     }
+    break;
     case STR:
+    {    
+        ResultantNode = StringLiteral::Create(P.toks[P.CurrentIndex],false);
+        P.next();
+        Expr = KExpr_Literal;
+    }
+        break;
     case CHAR:
     {
-        ResultantNode = std::make_shared<StringLiteral>(toks[CurrentIndex]);
-        next();
+        ResultantNode = StringLiteral::Create(P.toks[P.CurrentIndex],true);
+        P.next();
+        Expr = KExpr_Literal;
     }
+    break;
     case TRUE:
     case FALSE:
     {
-        ResultantNode = std::make_shared<BoolLiteral>(toks[CurrentIndex]);
-        next();
+        ResultantNode = BoolLiteral::Create(P.toks[P.CurrentIndex]);
+        P.next();
+        Expr = KExpr_Literal;
     }
+    break;
     default:
         break;
     }
@@ -589,211 +694,177 @@ bool Parser::ParseExpression(int &Precedance, KindExpression &Expr) {
 }
 
 
-bool Parser::ParseParenExpr() {
-    next();
-    dump(__func__);
-    AstPtr node;
-    if(check(RPAREN)){
-        err::out("expected expression found -> ",toks[CurrentIndex]);
+
+
+bool Parser::ParseLiteral(ParserHelper &P, Ast *&ResultantNode) {
+    tokt t = P.getTok();
+    switch (P.CurrentToken)
+    {
+    case INT:
+    {
+        ResultantNode = NumericLiteral::Create(t);
+    }
+    break;
+    case FLOAT:
+    {
+        ResultantNode = FloatLiteral::Create(t);
+    }
+    break;
+    case STR:
+        ResultantNode = StringLiteral::Create(t,true);
+        break;
+    case CHAR:
+        ResultantNode = StringLiteral::Create(t,false);
+        break;
+    case TRUE:
+    case FALSE:
+    {
+        ResultantNode = BoolLiteral::Create(t);
+    }
+    break;
+    default:
+        break;
+    }
+    P.next();
+    return true;
+}
+
+bool Parser::ParseParenExpr(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) {
+    P.next();
+    P.dump(__func__);
+    Ast* node;
+    if(P.check(RPAREN)){
+        err::out("expected expression found -> ",P.toks[P.CurrentIndex]);
         return false;
     }
-    if(!ParseExpr()){
+    if(!ParseExpr(P, ResultantNode)){
         return false;
     }
     node = ResultantNode;
 
-    if(!checkn(RPAREN)){
-        err::out("expected ')' found -> ",toks[CurrentIndex]);
+    if(!P.checkn(RPAREN)){
+        err::out("expected ')' found -> ",P.toks[P.CurrentIndex]);
         return false;
     } 
-    ResultantNode = std::make_shared<GroupedExpr>(ResultantNode);
-            dump2(__func__);
+    ResultantNode = GroupedExpr::Create(ResultantNode);
+            P.dump2(__func__);
 
     return true;
 }
 
-bool Parser::ParseIdentifier(){
+bool Parser::ParseIdentifier(ParserHelper &P, Ast *&ResultantNode){
     bool HasSelf = false;
-    tokt tok = toks[CurrentIndex];
-    if(check(SELF)){
+    tokt tok = P.toks[P.CurrentIndex];
+    if(P.check(SELF)){
         HasSelf = true;
     }
-    std::make_shared<Identifier>(tok, HasSelf);
-    next();
+    ResultantNode = Identifier::Create(tok);
+    P.next();
     return true;
 }
 
 
-bool Parser::ParsePrePostExpr(KindExpression &Expr) {
-   bool hasDot = false;
-   bool hasPostfix = false;
-   bool isParen = false;
-   if(check(LPAREN)){
-        if(!ParseParenExpr()){
+
+bool Parser::ParseDotArrowExpr(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) {
+    while(P.check(DOT)||P.check(ARROW)){
+        tokt tok = P.toks[P.CurrentIndex];
+        Token_type op = P.CurrentToken;
+        Ast* LHS = ResultantNode;
+        P.next();
+        if(!ParseExpr3(P,ResultantNode,Expr)){
             return false;
         }
-        Expr = KExpr_GroupedAcc;
-        isParen = true;
-   }else if(!ParseIdentifier()){
-        return false;
-   }
-    if(!check(LBRACK)&&!check(LPAREN)) {
-        goto dot;
-    }
-    hasPostfix = true;
-    if(!ParseIdentPostExpr(Expr)) {
-        return false;
-    }
-dot:
-    if(!check(ARROW)&&!check(DOT)) {
-        goto terminate;
-    }
-    hasDot = true;
-    if(!ParseDotArrowExpr(Expr)) {
-        return false;
-    }
-    Expr = KExpr_DotArrow;
-terminate:
-    
-    return true;
-}
-
-
-bool Parser::ParseIdentPostExpr(KindExpression &Expr){
-    while(!check(FEOF)&&(check(LBRACK)||check(LPAREN))){
-        if(check(LPAREN)) {
-            if(!ParseCall()){
-                return false;
-            }
-            Expr = KExpr_Call;
-        }else if(check(LBRACK)) {
-            if(!ParseArrayIndexExpr()){
-                return false;
-            }
-            Expr = KExpr_ArrayAccess;
-        }
+        ResultantNode = Expression::Create(LHS, op, ResultantNode, NodeMemExpr);
     }
     return true;
 }
 
 
-bool Parser::ParseDotArrowExpr(KindExpression &Expr) {
-    while(check(DOT)||check(ARROW)){
-        tokt tok = toks[CurrentIndex];
-        Token_type op = CurrentToken;
-        AstPtr LHS = ResultantNode;
-        next();
-        if(!ParsePrePostExpr(Expr)){
-            return false;
-        }
-        ResultantNode = std::make_shared<Expression>(tok, LHS, op, ResultantNode, NodeMemExpr);
-    }
-    return true;
-}
-
-
-bool Parser::ParseStructExpr() {
-    dump(__func__);      
+bool Parser::ParseStructExpr(ParserHelper &P, Ast *&ResultantNode) {
+    P.dump(__func__);      
     bool isDecl = false;
-    tokt tok = toks[CurrentIndex];
-    AstPtr sig = ResultantNode;
+    tokt tok = P.toks[P.CurrentIndex];
+    Ast* sig = ResultantNode;
     std::vector<tokt> Temp;
-    std::vector<AstPtr> Vals;
+    std::vector<Ast*> Vals;
 
-    if(checkn(LT)){
+    if(P.checkn(LT)){
         // if(!isAllowTemp){
-        //     err::out("template with extern not allowed ->",toks[CurrentIndex]);
+        //     err::out("template with extern not allowed ->",P.toks[P.CurrentIndex]);
         //     return false;
         // }
-        while(check(IDEN)){
-            Temp.push_back(toks[CurrentIndex]);
-            if(!checkn(COMMA))
+        while(P.check(IDEN)){
+            Temp.push_back(P.toks[P.CurrentIndex]);
+            if(!P.checkn(COMMA))
                 break;
         }
-        if(!checkn(GT)){
-            err::out("expected '>' found ->",toks[CurrentIndex]);
+        if(!P.checkn(GT)){
+            err::out("expected '>' found ->",P.toks[P.CurrentIndex]);
             return false;
         }
     }
 
-    if(!checkn(LBRACE)){
-        err::out("expected '{' found -> ",toks[CurrentIndex]);
+    if(!P.checkn(LBRACE)){
+        err::out("expected '{' found -> ",P.toks[P.CurrentIndex]);
         return false;
     }
 
-    while(!check(RBRACE)){
-        if(!ParseExpr()){
+    while(!P.check(RBRACE)){
+        if(P.check(DOT)) {
+            
+        }
+        if(!ParseExpr(P, ResultantNode)){
             return false;
         }
         Vals.push_back(ResultantNode);
         if(!Vals.back()){
             return false;
         }
-        if(!checkn(COMMA)){
+        if(!P.checkn(COMMA)){
             break;
         }
     }
 
-    if(!checkn(RBRACE)) {
-        err::out("expected '}' found -> ",toks[CurrentIndex]);
+    if(!P.checkn(RBRACE)) {
+        err::out("expected '}' found -> ",P.toks[P.CurrentIndex]);
         return false;
     }
-    ResultantNode = std::make_shared<PostfixExpr>(tok,sig,Temp,Vals,NodeStructDef);
-    dump2(__func__);
+    ResultantNode = PostfixExpr::Create(tok,sig,Temp,Vals,NodeStructDef);
+    P.dump2(__func__);
     return true;
 }
 
-bool Parser::ParseArrayIndexExpr() {
-    tokt tok = toks[CurrentIndex];
-    AstPtr Ident = ResultantNode;
-    std::vector<AstPtr>IndexVal;
-    while(!check(FEOF)&&!check(RBRACK)){
-        if(!ParseExpr()){
+bool Parser::ParseArrayIndexExpr(ParserHelper &P, Ast *&ResultantNode) {
+    tokt tok = P.toks[P.CurrentIndex];
+    Ast* Ident = ResultantNode;
+    std::vector<Ast*>IndexVal;
+    while(!P.check(FEOF)&&!P.check(RBRACK)){
+        if(!ParseExpr(P, ResultantNode)){
             return false;
         }
         IndexVal.push_back(ResultantNode);
-        if(!checkn(SCOL)){
+        if(!P.checkn(SCOL)){
             break;
         }
     }
-    if(!checkn(RBRACK)){
-        err::out("expected ']' found -> ",toks[CurrentIndex]);
+
+    if(!P.checkn(RBRACK)){
+        err::out("expected ']' found -> ",P.toks[P.CurrentIndex]);
         return false;
     }
-    ResultantNode = std::make_shared<PostfixExpr>(tok,Ident,std::vector<tokt>(),IndexVal,NodeIndexExpr);
+
+    ResultantNode = PostfixExpr::Create(tok,Ident,IndexVal,NodeIndexExpr);
 }
 
 
-bool Parser::ParseParenExpr() {
-    next();
-    dump(__func__);
-    AstPtr node;
-    if(check(RPAREN)){
-        err::out("expected expression found -> ",toks[CurrentIndex]);
-        return false;
-    }else if(!ParseExpr()){
-        return false;
-    }
-    node = ResultantNode;
 
-    if(CurrentToken != RPAREN){
-        err::out("expected ')' found -> ",toks[CurrentIndex]);
-        return false;
-    } 
-    next();
-    ResultantNode = std::make_shared<GroupedExpr>(ResultantNode);
-            dump2(__func__);
-
-    return true;
-}
-
-bool Parser::ParseBinaryExpr(int prev_prece) {
-    dump(__func__);
-    tokt tok = toks[CurrentIndex];
+bool Parser::ParseBinaryExpr(ParserHelper &P, Ast *&ResultantNode, int prev_prece) {
+    P.dump(__func__);
+    tokt tok = P.toks[P.CurrentIndex];
     Token_type opr;
-    AstPtr left;
+    Ast* left;
     if(!ResultantNode){
-        if(!ParseExpr2(prev_prece)){
+        if(!ParseExpr1(P,ResultantNode,prev_prece)){
             return false;
         }
         left = ResultantNode;
@@ -801,142 +872,145 @@ bool Parser::ParseBinaryExpr(int prev_prece) {
     left = ResultantNode;
 
     //2+3*3/4+2*3
-    while(BinaryOP(CurrentToken)) {
-        opr = CurrentToken;
-        int CurPrecedance = preced(opr);
+    while(P.BinaryOP(P.CurrentToken)) {
+        opr = P.CurrentToken;
+        int CurPrecedance = P.preced(opr);
         if(prev_prece > CurPrecedance) {
             ResultantNode = left;
             return true;
         }
-        next();
+        P.next();
         ResultantNode = nullptr;
-        if(!ParseExpr2(CurPrecedance += 1)){
+        if(!ParseExpr1(P, ResultantNode,++CurPrecedance)){
             return false;
         }
-        left = std::make_shared<Expression>(tok, left, opr, ResultantNode, NodeBinaryExpr);
+        left = Expression::Create(left, opr, ResultantNode, NodeBinaryExpr);
     }
     ResultantNode = left;
-            dump2(__func__);
+            P.dump2(__func__);
 
     return true;
 }
 
 
-bool Parser::ParseSpecificType() {
-    tokt tok = toks[CurrentIndex];
-    ParseIdentifier();
-    AstPtr Name = ResultantNode;
-    if(checkn(LT)){
+bool Parser::ParseSpecificType(ParserHelper &P, Ast *&ResultantNode) {
+    tokt tok = P.toks[P.CurrentIndex];
+    ParseIdentifier(P,ResultantNode);
+    Ast* Name = ResultantNode;
+    if(P.checkn(LT)){
         std::vector<tokt>Temp;
-        while(check(IDEN)){
-            Temp.push_back(toks[CurrentIndex]);
-            if(!checkn(COMMA))
+        while(P.check(IDEN)){
+            Temp.push_back(P.toks[P.CurrentIndex]);
+            if(!P.checkn(COMMA))
                 break;
         }
-        if(!checkn(GT)){
-            err::out("expected '>' found -",toks[CurrentIndex]);
+        if(!P.checkn(GT)){
+            err::out("expected '>' found -",P.toks[P.CurrentIndex]);
             return false;
         }
-        ResultantNode = std::make_shared<PostfixExpr>();
+        ResultantNode = PostfixExpr::Create(Name, Temp);
     }
     return true;
 }
 
-bool Parser::ParseEnumStmt() {
+bool Parser::ParseEnumStmt(ParserHelper &P, Ast *&ResultantNode) {
     std::vector<tokt>udata;
-    std::vector<AstPtr>val;
-    if(!checkn(ENUM)){
-        err::out("expected 'enum' keyword found -",toks[CurrentIndex]);
+    std::vector<Ast*>val;
+    if(!P.checkn(ENUM)){
+        err::out("expected 'enum' keyword found -",P.toks[P.CurrentIndex]);
         return false;
     }
-    if(!checkn(LBRACE)){
-        err::out("expected '{' found ->",toks[CurrentIndex]);
+    if(!P.check(IDEN)) {
+        err::out("expected 'identifier' found -",P.toks[P.CurrentIndex]);
+        return false;
+    }
+    tokt Name = P.toks[P.CurrentIndex];
+
+    if(!P.checkn(LBRACE)){
+        err::out("expected '{' found ->",P.toks[P.CurrentIndex]);
         return false;
     }
 
-    while(check(IDEN)){
-        udata.push_back(toks[CurrentIndex]);
-        if(checkn(ASSN)){
-            if(!ParseExpr()){
+    while(P.check(IDEN)){
+        udata.push_back(P.toks[P.CurrentIndex]);
+        if(P.checkn(ASSN)){
+            if(!ParseExpr(P, ResultantNode)){
                 return false;
             }
             val.push_back(ResultantNode);
         }
-        if(!checkn(COMMA)){
-            err::out("expected ',' found ->",toks[CurrentIndex]);
+        if(!P.checkn(COMMA)){
+            err::out("expected ',' found ->",P.toks[P.CurrentIndex]);
             return false;
         }
     }
 
-    if(!checkn(RBRACE)){
-        err::out("expected '}' found ->",toks[CurrentIndex]);
+    if(!P.checkn(RBRACE)){
+        err::out("expected '}' found ->",P.toks[P.CurrentIndex]);
         return false;
     }
-    ResultantNode = std::make_shared<EnumExpr>(udata,val);
+    ResultantNode = EnumExpr::Create(Name, udata, val);
     return true;
 }
 
-bool Parser::ParseStructStmt() {
-    dump(__func__);
-    bool isDecl = false;
-    tokt tok = toks[CurrentIndex];
+
+bool Parser::ParseStructStmt(ParserHelper &P, Ast *&ResultantNode) {
+    P.dump(__func__);
+    tokt tok = P.toks[P.CurrentIndex];
     std::vector<tokt> ElementName;
-    std::vector<AstPtr> ElementTy;
+    std::vector<Ast*> ElementTy;
     std::vector<tokt> Temp;
-    if(!checkn(STRUCT)) {
-        err::out("expected keyword 'struct' found ->",toks[CurrentIndex]);
+    if(!P.checkn(STRUCT)) {
+        err::out("expected keyword 'struct' found ->",P.toks[P.CurrentIndex]);
         return false;
     }
 
+    if(!P.check(IDEN)) {
+        err::out("expected 'identifier' found ->",P.toks[P.CurrentIndex]);
+        return false;
+    }
+    tokt Name = P.toks[P.CurrentIndex];
   
-    if(checkn(LT)){
-        while(check(IDEN)){
-            Temp.push_back(toks[CurrentIndex]);
-            if(!checkn(COMMA))
+    if(P.checkn(LT)){
+        while(P.check(IDEN)){
+            Temp.push_back(P.toks[P.CurrentIndex]);
+            if(!P.checkn(COMMA))
                 break;
         }
-        if(!checkn(GT)){
-            err::out("expected '>' found ->",toks[CurrentIndex]);
+        if(!P.checkn(GT)){
+            err::out("expected '>' found ->",P.toks[P.CurrentIndex]);
             return false;
         }
     }
 
-    if(!check(SCOL)) {
-        isDecl = true;
-        goto done;
-    }
-
-
-    if(!check(LBRACE)){
-        err::out("expected field expression '{' found -> ",toks[CurrentIndex]);
+    if(!P.check(LBRACE)){
+        err::out("expected field expression '{' found -> ",P.toks[P.CurrentIndex]);
         return false;
     }
 
-    while(CurrentToken !=  FEOF && check(IDEN)){
-        ElementName.push_back(toks[CurrentIndex]);
-        if(checkn(COL)){
-            err::out("expected struct field expression ':' found - ",toks[CurrentIndex]);
+    while(P.CurrentToken !=  FEOF && P.check(IDEN)){
+        ElementName.push_back(P.toks[P.CurrentIndex]);
+        if(P.checkn(COL)){
+            err::out("expected struct field expression ':' found - ",P.toks[P.CurrentIndex]);
             return false;
         }
-        if(!ParseType()){
-            err::out("expected struct field expression ': ?type' found - ",toks[CurrentIndex]);
+        if(!ParseType(P,ResultantNode)){
+            err::out("expected struct field expression ': ?type' found - ",P.toks[P.CurrentIndex]);
             return false;
         }
         ElementTy.push_back(ResultantNode);
-        if(!checkn(COMMA)){
+        if(!P.checkn(COMMA)){
             break;
         }
     }
 
-    if(!checkn(RBRACE)){
-        err::out("expected '}' found -> ",toks[CurrentIndex]);
+    if(!P.checkn(RBRACE)){
+        err::out("expected '}' found -> ",P.toks[P.CurrentIndex]);
         return false;
     }
 
-
-done:
-    ResultantNode = std::make_shared<StructStmt>(tok, Temp, ElementName, ElementTy, isDecl);
-    dump2(__func__);
+    ResultantNode = StructStmt::Create(tok, Name, Temp, ElementName, ElementTy);
+    P.dump2(__func__);
 
     return true;
 }
@@ -944,516 +1018,450 @@ done:
 
 
 
-bool Parser::ParseFuncDef() {
-     dump(__func__);
-    // tokt tok = toks[CurrentIndex];
+bool Parser::ParseFuncDef(ParserHelper &P, Ast *&ResultantNode) {
+     P.dump(__func__);
+    tokt tok = P.toks[P.CurrentIndex];
     std::vector<tokt>pN;
-    std::vector<AstPtr>pTy;
-    AstPtr RetVal = nullptr;
-    AstPtr StructVal = nullptr;
-    AstPtr Block = nullptr;
-    bool isDecl = false;
+    std::vector<Ast*>pTy;
+    Ast* RetVal = nullptr;
+    Ast* StructVal = nullptr;
+    Ast* Block = nullptr;
 
-    if(!checkn(FN)) {
-        err::out("expected keyword 'fn' found ->\'",toks[CurrentIndex]);
+    if(!P.checkn(FN)) {
+        err::out("expected keyword 'fn' found ->\'",P.toks[P.CurrentIndex]);
         return false;
     }
-    if(!check(IDEN)){
-        err::out("expected 'Identifier' with function defination found ->\'",toks[CurrentIndex]);
+    if(!P.check(IDEN)){
+        err::out("expected 'Identifier' with function defination found ->\'",P.toks[P.CurrentIndex]);
         return false;
     }   
-    tokt Name = toks[CurrentIndex];
+    tokt Name = P.toks[P.CurrentIndex];
 
-    if(checkn(LPAREN)) {
-        err::out("expected function expression (parameters : type) found -> ",toks[CurrentIndex]);
+    if(P.checkn(LPAREN)) {
+        err::out("expected function expression (parameters : type) found -> ",P.toks[P.CurrentIndex]);
         return false;
     }
-    while(check(IDEN)) {
-        pN.push_back(toks[CurrentIndex]);
-        if(!checkn(IS)&&!checkn(SCOL)){
-            err::out("expected { 'is',':' } found -> \'",toks[CurrentIndex]);
+    while(P.check(IDEN)) {
+        pN.push_back(P.toks[P.CurrentIndex]);
+        if(!P.checkn(SCOL)){
+            err::out("expected ':' found -> \'",P.toks[P.CurrentIndex]);
             return false;
         }
-        if(!ParseType()) {
+        if(!ParseType(P,ResultantNode)) {
             return false;
         }
         pTy.push_back(ResultantNode);
         
-        if(!checkn(COMMA)) {
+        if(!P.checkn(COMMA)) {
             break;
         }
     }
 
-    if(!checkn(RPAREN)){
-        err::out("expected ')' found -> ",toks[CurrentIndex]);
+    if(!P.checkn(RPAREN)){
+        err::out("expected ')' found -> ",P.toks[P.CurrentIndex]);
         return false;
     }
 
-    if(checkn(ARROW)){
-        if(!ParseType()){
-            err::out("expected 'type' found -> ",toks[CurrentIndex]);
+    if(P.checkn(ARROW)){
+        if(!ParseType(P,ResultantNode)){
+            err::out("expected 'type' found -> ",P.toks[P.CurrentIndex]);
             return false;
         }
         RetVal = ResultantNode;
     }
 
-    if(check(SCOL)){
-        isDecl = true;
-        goto done;
-    }
 
-    if(checkn(FOR)){
-        if(!check(IDEN)){
-            err::out("fn-for statements can only have struct type  - ",toks[CurrentIndex]);
-            return false;
-        }
-        if(!ParseSpecificType()) {
-            return false;
-        }
-        StructVal = ResultantNode;
-    }
-
-    if(check(LBRACE)) {
+    if(P.check(LBRACE)) {
         bool isBrace = true;
-        if(!ParseBlock(isBrace)){
+        if(!ParseBlock(P, ResultantNode,isBrace)){
             return false;
         }
         Block = ResultantNode;
     }else{
-        err::out("expected function body expression '{}' found - ",toks[CurrentIndex]);
+        err::out("expected function body expression '{}' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
-done:
-    ResultantNode = std::make_shared<FunctionDef>(Name, pN, pTy, StructVal, RetVal, Block, isDecl);
-    dump2(__func__);
+    ResultantNode = FunctionDef::Create(tok,Name, pN, pTy, RetVal, Block);
+    P.dump2(__func__);
     return true;
 }
 
-bool Parser::ParseIfStmt() {
-    dump(__func__);
-    tokt tok = toks[CurrentIndex];
-    if(!checkn(IF)){
-        err::out("expected 'if' found - ",toks[CurrentIndex]);   
+bool Parser::ParseIfStmt(ParserHelper &P, Ast *&ResultantNode) {
+    P.dump(__func__);
+    tokt tok = P.toks[P.CurrentIndex];
+    if(!P.checkn(IF)){
+        err::out("expected 'if' found - ",P.toks[P.CurrentIndex]);   
         return false;
     }
-    AstPtr condition = nullptr;
-    AstPtr if_ = nullptr;
-    AstPtr else_ = nullptr;
+    Ast* condition = nullptr;
+    Ast* if_ = nullptr;
+    Ast* else_ = nullptr;
 
-    if(check(LBRACE)) {
-        err::out("expected 'condition' found - ",toks[CurrentIndex]);
+    if(P.check(LBRACE)) {
+        err::out("expected 'condition' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
 
-    if(!ParseExpr()){
+    if(!ParseExpr(P, ResultantNode)){
         return false;
     }
 
     condition = ResultantNode;
 
-    // if(checkn(COL)){
+    // if(P.checkn(COL)){
     //     //todo
     // }
 
     bool isBrace = true;
-    if(!ParseBlock(isBrace)){
+    if(!ParseBlock(P, ResultantNode,isBrace)){
         return false;
     }
     if_ = ResultantNode;
 
-    if(checkn(ELSE)) {
-        switch(CurrentToken){
+    if(P.checkn(ELSE)) {
+        switch(P.CurrentToken){
             case IF:
-                if(!ParseIfStmt()){
+                if(!ParseIfStmt(P,ResultantNode)){
                     return false;
                 }
                 else_ = ResultantNode;
                 break;
             case LBRACE:
-                if(!ParseBlock(isBrace)){
+                if(!ParseBlock(P, ResultantNode, isBrace)){
                     return false;
                 }
                 else_ = ResultantNode;
                 break;
             default:
-                err::out("invalid else expression ",toks[CurrentIndex]);
+                err::out("invalid else expression ",P.toks[P.CurrentIndex]);
                 return false;
 
         }
     }
-    ResultantNode = std::make_shared<IfStatement>(tok,condition, if_, else_);
-            dump2(__func__);
+    ResultantNode = IfStmt::Create(tok,condition, if_, else_);
+            P.dump2(__func__);
 
     return true;
 }
 
-bool Parser::ParseForStmt(){
-    tokt tok = toks[CurrentIndex];
-    AstPtr var = nullptr;
-    AstPtr cond = nullptr;
-    AstPtr incr = nullptr;
-    AstPtr body = nullptr;
-    if(!checkn(FOR)) {
-        err::out("expected keyword 'for' found - ",toks[CurrentIndex]);
+bool Parser::ParseForStmt(ParserHelper &P, Ast *&ResultantNode){
+    tokt tok = P.toks[P.CurrentIndex];
+    Ast* var = nullptr;
+    Ast* cond = nullptr;
+    Ast* incr = nullptr;
+    Ast* body = nullptr;
+    if(!P.checkn(FOR)) {
+        err::out("expected keyword 'for' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
 
-    if(checkn(SCOL)){
+    if(P.checkn(SCOL)){
         goto cond;
     }
-    if(!check(LET)){
-        err::out("expected for expression 'identifier' found - ",toks[CurrentIndex]);
+    if(!P.check(LET)){
+        err::out("expected for expression 'identifier' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
-    if(!ParseVarStmt()){
+    if(!ParseVarStmt(P, ResultantNode)){
         return false;
     }
     var = ResultantNode;
-    if(!checkn(SCOL)){
-        err::out("expected for expression ';' found - ",toks[CurrentIndex]);
+    if(!P.checkn(SCOL)){
+        err::out("expected for expression ';' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
 cond:
-    if(checkn(SCOL)){
+    if(P.checkn(SCOL)){
         goto incr;
     }
-    if(!ParseExpr()){
+    if(!ParseExpr(P, ResultantNode)){
         return false;
     }
     cond = ResultantNode;
-    if(!checkn(SCOL)){
-        err::out("expected for expression ';' found - ",toks[CurrentIndex]);
+    if(!P.checkn(SCOL)){
+        err::out("expected for expression ';' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
 
 incr:
-    if(check(LBRACE)){
+    if(P.check(LBRACE)){
         goto incr;
     }
-    if(!ParseExpr()){
+    if(!ParseExpr(P, ResultantNode)){
         return false;
     }
     incr = ResultantNode;
 body:
     bool isBrace = true;
-    if(!ParseBlock(isBrace)){
+    if(!ParseBlock(P,ResultantNode,isBrace)){
         return false;
     }
     body = ResultantNode;
-    ResultantNode = std::make_shared<ForLoop>(tok, var, cond, incr, body);
+    ResultantNode = ForLoop::Create(tok, var, cond, incr, body);
     return true;
 }
 
 
 // ref from rust lang and scribe
-bool Parser::ParseForInStmt() {
-    dump(__func__);
-    tokt tok = toks[CurrentIndex];
-    AstPtr in = nullptr;
-    AstPtr var = nullptr;
-    AstPtr cond = nullptr;
-    AstPtr incr = nullptr;
-    AstPtr body = nullptr;
-    if(!checkn(FOR)) {
-        err::out("expected keyword 'for' found - ",toks[CurrentIndex]);
+bool Parser::ParseForInStmt(ParserHelper &P, Ast *&ResultantNode) {
+    P.dump(__func__);
+    tokt tok = P.toks[P.CurrentIndex];
+    Ast* in = nullptr;
+    Ast* var = nullptr;
+    Ast* cond = nullptr;
+    Ast* incr = nullptr;
+    Ast* body = nullptr;
+    bool isBrace = true;
+    if(!P.checkn(FOR)) {
+        err::out("expected keyword 'for' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
 
-    if(!check(IDEN)){
-        err::out("expected 'identifier' found - ",toks[CurrentIndex]);
+    if(!P.check(IDEN)){
+        err::out("expected 'identifier' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
-    ParseIdentifier();
-    AstPtr tempvar = ResultantNode;
+    ParseIdentifier(P,ResultantNode);
+    Ast* tempvar = ResultantNode;
+    tokt iter_tempvar__tok = P.getTok();
 
 
-
-    if(!checkn(IN)){
-        err::out("expected keyword 'in' found -> ",toks[CurrentIndex]);
+    if(!P.checkn(IN)){
+        err::out("expected keyword 'in' found -> ",P.toks[P.CurrentIndex]);
         return false;
     }
     // 0..1 , iter
 
-    if(check(LBRACE)){
-        err::out("expected 'expression' found -> ",toks[CurrentIndex]);
+    if(P.check(LBRACE)){
+        err::out("expected 'expression' found -> ",P.toks[P.CurrentIndex]);
         return false;
     }
+    if(P.check(INT)){
+        Ast *from;
+        Ast *to;
+        Ast *intlit;
 
-    if(!check(INT)){
-        goto iter;
-    }
-    if(!ParseLiteral()){
-        return false;
-    }
-    AstPtr from = ResultantNode;
-    if(!checkn(DOTDOT)){
-        err::out("expected for-in expression '..' found - ",toks[CurrentIndex]);
-        return false;
-    }
-    if(!check(INT)||!ParseLiteral()){
-        err::out("expected for-in expression 'integer' after '..' found - ",toks[CurrentIndex]);
-        return false;
-    }
-    AstPtr to = ResultantNode;
-
-    AstPtr intlit = nullptr;
-    if(checkn(DOTDOT)){
-       if(!check(INT)||!ParseLiteral()){
-            err::out("expected for-in expression integer after '..' found - ",toks[CurrentIndex]);
+        from = NumericLiteral::Create(P.toks[P.CurrentIndex]);
+        P.next();
+        if(!P.checkn(DOTDOT)){
+            err::out("expected for-in expression '..' found - ",P.toks[P.CurrentIndex]);
             return false;
         }
-        intlit = ResultantNode;
-    }else{
-        intlit = std::make_shared<NumericLiteral>(tokt(-1,-1,"1",INT));
+
+        if(!P.check(INT)){
+            err::out("expected for-in expression integer after '..' found - ",P.toks[P.CurrentIndex]);
+            return false;
+        }
+
+        to = NumericLiteral::Create(P.toks[P.CurrentIndex]);;
+        P.next();
+
+        if(P.checkn(DOTDOT)){
+            if(!P.check(INT)){
+                err::out("expected for-in expression integer after '..' found - ",P.toks[P.CurrentIndex]);
+                return false;
+            }
+            intlit = NumericLiteral::Create(P.toks[P.CurrentIndex]);;
+            P.next();
+        }else{
+            tokt t = tokt(-1,-1,"1",INT);
+            intlit = NumericLiteral::Create(t);
+        }
+        
+        if(!ParseBlock(P,ResultantNode,isBrace)){
+            return false;
+        }
+        body = ResultantNode;
+        var = VarStmt::Create(iter_tempvar__tok,tempvar, nullptr, from,false);
+        cond = Expression::Create(tempvar, LT, to,NodeBinaryExpr);
+        incr = Expression::Create(tempvar, ASSN_PLUS, intlit,NodeBinaryExpr);
+        ResultantNode = ForLoop::Create(tok, var, cond, incr, body);
+        return true; 
+
+    }else{    
+        if(!ParseExpr(P,ResultantNode)) {
+            err::out("for-in use only { 1..5..1 , .iter()} -> ",P.getTok());
+            return false;
+        }
+        if(ResultantNode->nodeCategory() != NodeMemExpr){
+            err::out("expected 'iterator' expression found -> ",P.getTok());
+            return false;
+        }
+        in = ResultantNode;
+
+        bool isBrace = true;
+        if(!ParseBlock(P,ResultantNode,isBrace)){
+            return false;
+        }
+        body = ResultantNode;
+        
+        ///<iterVar> = <vector.iter()>
+        tokt iter_var_tok = tokt(-1, -1, "iterVar", IDEN);
+        tokt iter__tempvar__tok = tokt(-1, -1, "_"+tempvar->toString(), IDEN);
+        tokt iter_begin_tok = tokt(-1, -1, "begin", IDEN);
+        tokt iter_end_tok = tokt(-1, -1, "end", IDEN);
+        tokt iter_next_tok = tokt(-1, -1, "next", IDEN);
+        tokt iter_at_tok = tokt(-1, -1, "at", IDEN);
+
+        Ast* iter_begin_Iden = Identifier::Create(iter_begin_tok);
+        Ast* iter_end_Iden = Identifier::Create(iter_end_tok);
+        Ast* iter_next_Iden = Identifier::Create(iter_next_tok);
+        Ast* iter_at_Iden = Identifier::Create(iter_at_tok);
+
+        Ast* iter_tempvar_ident = Identifier::Create(iter__tempvar__tok);
+        Ast* iter_var_ident = Identifier::Create(iter_var_tok);
+
+        Ast* iter_decl = VarStmt::Create(iter_var_tok, iter_var_ident, nullptr, in, false);
+        std::vector<Ast*>args;
+        Ast* begin_call = FunctionCall::Create(iter_begin_tok,iter_begin_Iden,args);
+        Ast* iter_dot_begin_call = Expression::Create(iter_var_ident, DOT, begin_call, NodeMemExpr);
+        var = VarStmt::Create(iter__tempvar__tok, iter_tempvar_ident, nullptr, iter_dot_begin_call,false);
+
+        ///<_temp> != <iterVar.end()>
+        Ast* end_call = FunctionCall::Create(iter_end_tok, iter_end_Iden, args);
+        Ast* iter_end_call = Expression::Create(iter_var_ident, DOT, end_call, NodeMemExpr);
+        cond = Expression::Create(iter_tempvar_ident, NEQL, iter_end_call, NodeBinaryExpr);
+
+        ///<iterVar.next(_temp)>
+        args.clear();
+        args = {iter_tempvar_ident};
+        Ast* nextcall = FunctionCall::Create(iter_next_tok, iter_next_Iden, args);
+        Ast* iternext = Expression::Create( iter_var_ident, DOT, nextcall, NodeMemExpr);
+        incr = Expression::Create(iter_tempvar_ident, ASSN, iternext, NodeAssnExpr);
+
+        ///<var = _iterVar.at()>
+        args.clear();
+        args = {iter_tempvar_ident};
+        Ast* at_call = FunctionCall::Create(iter_at_tok, iter_at_Iden, args);
+        Ast* iter_at_call = Expression::Create(iter_var_ident, DOT, at_call, NodeMemExpr);
+        Ast* inside_loop_var_decl = VarStmt::Create(iter_tempvar__tok, tempvar, nullptr, iter_at_call, false);
+
+        
+        auto Block = static_cast<BlockStmt*>(body);
+        Block->getStmts().insert(Block->getStmts().begin(), inside_loop_var_decl);
+        body = Block;
+        ResultantNode = ForLoop::Create(tok, var, cond, incr, body);
+                P.dump2(__func__);
+        std::vector<Ast*>b = {iter_decl, ResultantNode};
+        ResultantNode = BlockStmt::Create(b);
     }
-    bool isBrace = true;
-    if(!ParseBlock(isBrace)){
-        return false;
-    }
-    body = ResultantNode;
-    var = std::make_shared<VarStmt>(nullptr,tempvar, nullptr, from);
-    cond = std::make_shared<Expression>(tempvar, LT, to,NodeBinaryExpr);
-    incr = std::make_shared<Expression>(tempvar, ASSN_PLUS, intlit,NodeBinaryExpr);
-    ResultantNode = std::make_shared<ForLoop>(tok, var, cond, incr, body);
-    return true; 
-iter:    
-    if(!ParseExpr()) {
-        err::out("for-in use only { 1..5..1 , .iter()} -> ",toks[CurrentIndex]);
-        return false;
-    }
-    if(ResultantNode->nodeCategory() != NodeMemExpr){
-        err::out("expected 'iterator' expression found -> ",toks[CurrentIndex]);
-        return false;
-    }
-    in = ResultantNode;
-
-    bool isBrace = true;
-     if(!ParseBlock(isBrace)){
-        return false;
-    }
-    body = ResultantNode;
-    
-    ///<iterVar> = <vector.iter()>
-    tokt iterdecltok = tokt(-1, -1, "iterVar", IDEN);
-    tokt iterTempVartok = tokt(-1, -1, "_"+tempvar->toString(), IDEN);
-    tokt iterbegintok = tokt(-1, -1, "begin", IDEN);
-    tokt iterendtok = tokt(-1, -1, "end", IDEN);
-    tokt iternexttok = tokt(-1, -1, "next", IDEN);
-    tokt iterattok = tokt(-1, -1, "at", IDEN);
-
-    AstPtr iterbeginIden = std::make_shared<Identifier>(iterbegintok);
-    AstPtr iterendIden = std::make_shared<Identifier>(iterendtok);
-    AstPtr iternextIden = std::make_shared<Identifier>(iternexttok);
-    AstPtr iteratIden = std::make_shared<Identifier>(iterattok);
-
-    AstPtr iterTempVarName = std::make_shared<Identifier>(iterTempVartok);
-    AstPtr iterDeclName = std::make_shared<Identifier>(iterdecltok);
-
-    AstPtr iterdecl = std::make_shared<VarStmt>(nullptr, iterDeclName, nullptr, in, false);
-
-    AstPtr begincall = std::make_shared<FunctionCall>(iterbegintok,iterbeginIden,std::vector<AstPtr>());
-    AstPtr iterBegin = std::make_shared<Expression>(iterdecltok,iterDeclName, DOT, begincall, NodeMemExpr);
-    var = std::make_shared<VarStmt>(iterTempVartok, iterTempVarName, nullptr, iterBegin);
-
-    ///<_temp> != <iterVar.end()>
-    AstPtr endcall = std::make_shared<FunctionCall>(iterendtok, iterendIden, std::vector<AstPtr>());
-    AstPtr iterend = std::make_shared<Expression>(iterdecltok, iterDeclName, DOT, endcall, NodeMemExpr);
-    cond = std::make_shared<Expression>(iterTempVarName, NEQL, iterend, NodeBinaryExpr);
-
-    ///<iterVar.next(_temp)>
-    AstPtr nextcall = std::make_shared<FunctionCall>(iternexttok, iternextIden, std::vector<AstPtr>(1,iterDeclName));
-    AstPtr iternext = std::make_shared<Expression>(iterdecltok, iterDeclName, DOT, nextcall, NodeMemExpr);
-    incr = std::make_shared<Expression>(iterTempVarName, ASSN, iternext, NodeAssnExpr);
-
-    ///<var = _iterVar.at()>
-    AstPtr atcall = std::make_shared<FunctionCall>(iterattok, iteratIden, std::vector<AstPtr>(1,iterDeclName));
-    AstPtr iterat = std::make_shared<Expression>(iterdecltok, iterDeclName, DOT, atcall);
-    AstPtr insideloop = std::make_shared<Expression>(tempvar, ASSN, iterat, NodeAssnExpr);
-
-     
-    auto Block = std::dynamic_pointer_cast<BlockStatement>(body);
-    Block->getStmts().insert(Block->getStmts().begin(), insideloop);
-    body = Block;
-    ResultantNode = std::make_shared<ForLoop>(tok, var, cond, incr, body);
-            dump2(__func__);
-    ResultantNode = std::make_shared<BlockStatement>(std::vector<AstPtr>{iterdecl, ResultantNode});
     return true;
 }
 
 
-bool Parser::ParseExtern() {
-    tokt tok = toks[CurrentIndex];
-    next();
-    std::vector<AstPtr>Header;
-    if(!checkn(LBRACK)){
-        err::out("expected '[' found - ",toks[CurrentIndex]);
+bool Parser::ParseExtern(ParserHelper &P, Ast *&ResultantNode) {
+    tokt tok = P.toks[P.CurrentIndex];
+    P.next();
+    std::vector<Ast*>Header;
+    if(!P.checkn(LBRACK)){
+        err::out("expected '[' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
-    if(!check(IDEN)) {
-        err::out("expected 'identifier' found - ",toks[CurrentIndex]);
+    if(!P.check(IDEN)) {
+        err::out("expected 'identifier' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
-    if(!ParseIdentifier()){
-        return false;
-    }
-    Header.push_back(ResultantNode);
-    if(!check(STR)) {
-        err::out("expected 'string' found - ",toks[CurrentIndex]);
-        return false;
-    }
-    if(!ParseLiteral()){
+    if(!ParseIdentifier(P,ResultantNode)){
         return false;
     }
     Header.push_back(ResultantNode);
-    if(!checkn(RBRACK)){
-        err::out("expected ']' found - ",toks[CurrentIndex]);
+    if(!P.check(STR)) {
+        err::out("expected 'string' found - ",P.toks[P.CurrentIndex]);
         return false;
     }
-    if(check(SCOL)){
-        goto end;
+    if(!ParseLiteral(P,ResultantNode)){
+        return false;
     }
-    if(check(FN)){
-        if(!ParseFuncDef()) {
+    Header.push_back(ResultantNode);
+    if(!P.checkn(RBRACK)){
+        err::out("expected ']' found - ",P.toks[P.CurrentIndex]);
+        return false;
+    }
+
+    if(P.check(FN)){
+        if(!ParseFuncDef(P, ResultantNode)) {
             return false;
         }
-    }else if(check(STRUCT)){
-        if(!ParseStructStmt()) {
+    }else if(P.check(STRUCT)){
+        if(!ParseStructStmt(P, ResultantNode)) {
+            return false;
+        }
+    }else if(P.check(LET)) {
+        if(!ParseVarStmt(P, ResultantNode)) {
             return false;
         }
     }else{
-        err::out("expected fn and struct statement block with extern found - ",toks[CurrentIndex]);
+        err::out("expected fn and struct statement block with extern found - ",P.toks[P.CurrentIndex]);
         return false;
     }
     Header.push_back(ResultantNode);
-end:
-    ResultantNode = std::make_shared<Extern>(tok, Header);
+
+    ResultantNode = Extern::Create(tok, Header);
     return true;
 }
 
 
-bool Parser::ParseVarStmt() {
-    tokt tok = toks[CurrentIndex];
-    AstPtr Var;
-    AstPtr Ty;
-    AstPtr Val;
+bool Parser::ParseVarStmt(ParserHelper &P, Ast *&ResultantNode) {
+    tokt tok = P.toks[P.CurrentIndex];
+    Ast* Var;
+    Ast* Ty;
+    Ast* Val;
     bool isty = false;
     bool isval = false;
     bool isuse = false;
     bool isIs = false;
     bool isIn = false;
     bool isConst = false;
-    if(!checkn(LET)){
-        err::out("expected 'let' found -> ",toks[CurrentIndex]);
+    if(!P.checkn(LET)){
+        err::out("expected 'let' found -> ",P.toks[P.CurrentIndex]);
         return false;
     }
-    if(checkn(CONST)){
+    if(P.checkn(CONST)){
         isConst = true;
     }
 
-    if(!check(IDEN)){
-        err::out("expected 'identifier' found -> ",toks[CurrentIndex]);
+    if(!P.check(IDEN)){
+        err::out("expected 'identifier' found -> ",P.toks[P.CurrentIndex]);
         return false;
     }
-    ParseIdentifier();
+    ParseIdentifier(P,ResultantNode);
     Var = ResultantNode;
 
-    if(!checkn(COL)){
-        goto is;
+    if(!P.checkn(COL)){
+        goto val;
     }
     
     isty = true;
-    if(!ParseType()){
+    if(!ParseType(P,ResultantNode)){
         return false;
     }
     Ty = ResultantNode;
-// is:
-//     if(!checkn(IS)){
-//         goto val;
-//     }
-//     isIs = true;
-//     // bool isExtern = false;
-//     if(check(EXTERN)) {
-//         if(!ParseExtern()){
-//             return false;
-//         }
-//         // isExtern = true;
-//     }else if(check(STRUCT)) {
-//         if(!ParseStructStmt()){
-//             return false;
-//         }
-//     }else if(check(ENUM)) {
-//         if(!ParseEnumStmt()){
-//             return false;
-//         }
-//     }else{
-//         err::out("let-is statements can only have statement "
-// 					"(eg. function, struct, enum, extern, import decalaration ) - ", toks[CurrentIndex]);
-//         return false;
-//     }
-//     Val = ResultantNode;
 
 val:  
-
-    if(!checkn(ASSN)){
+    if(!P.checkn(ASSN)){
         goto done;
     }
     isval = true;
-    if(!ParseExpr()){
+    if(!ParseExpr(P, ResultantNode)){
             return false;
     }
     Val = ResultantNode;
 done:
     if(!isval && !isty){
-        err::out("invalid variable declaration - no type or value set", tok);
+        err::out("invalid variable declaration - no type or value set", P.getTok());
         return false;
     }
-    if(isuse){
-        if(isval){
-            err::out("let-use statements can only have path "
-					"(../../..) - no assignment allowed", tok);
+    
+    if(isConst) {
+        if(!isval||!isty) {
+            err::out("let-const statements should have type and val "
+					" - no 'in' and 'is' allowed", P.getTok());
     
             return false;
         }
-        if(isty){
-            err::out("let-use statements can only have path "
-					"(../../..) - no type allowed", tok);
-    
-            return false;
-        }
-        if(isIs||isIn){
-            err::out("let-use statements can only have path "
-					"(../../..) - no 'in' and 'is' allowed", tok);
-    
-            return false;
-        }
-    } 
-    
-    // if(isConst) {
-    //     if(isIs) {
-    //         err::out("let-const statements can only have type and val "
-	// 				" - no 'in' and 'is' allowed", tok);
-    
-    //         return false;
-    //     }
-    // }
+    }
 
-    // if(isIs){
-    //     if(isval){
-    //         err::out("let-is statements can only have statement "
-	// 				"(function, struct, enum definitions) - no assignment allowed", tok);
-    
-    //         return false;
-    //     }
-    //     if(isty){
-    //         err::out("let-is statements can only have statement "
-	// 				"(function, struct, enum definitions) - no type allowed", tok);
-    
-    //         return false;
-    //     }
-    // }
-
-
-    ResultantNode = std::make_shared<VarStmt>(tok, Var, Ty, Val, isConst);
+    ResultantNode = VarStmt::Create(tok, Var, Ty, Val, isConst);
     return true;
 }
 } // namespace parser

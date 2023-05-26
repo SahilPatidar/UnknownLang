@@ -1,18 +1,9 @@
 
-#include"parser/Ast.hpp"
+#include"../../include/parser/Ast.hpp"
+// #include"parser/Ast.hpp"
 
 namespace ast {
     
-    std::string Program::toString() const {
-        std::string str = "";
-
-        for(int i = 0 ; i < statms.size(); i++){
-            str += statms[i]->toString();
-            str += '\n';
-        }
-        return str;
-    }
-
     std::string NumericLiteral::toString() const{
         return tok.data;
     }
@@ -37,7 +28,7 @@ namespace ast {
         return tok.data;
     }
 
-    std::string BlockStatement::toString() const {
+    std::string BlockStmt::toString() const {
         std::string str = "";
         for(int i = 0 ; i < statms.size(); i++){
             str += statms[i]->toString();
@@ -48,38 +39,26 @@ namespace ast {
 
     std::string Extern::toString() const {
         std::string str = "extern ";
-        str += lib->toString();
-        str += block->toString();
-        return str;
-    }
-    
-    std::string Use::toString() const {
-        std::string str = "use";
-        str += name->toString();
-        str += path->toString();
-        str += ";\n";
-        return str;
-    }
-    
-    std::string Tuple::toString() const {
-        std::string str = "(";
-        for(auto& t:tuple){
-            str += t->toString();
-            str += ", ";
+        for(int i = 0, size = header.size(); i < size; i++) {
+            str += header[i]->toString();
         }
-        str += ")";
         return str;
     }
+    
 
     std::string EnumExpr::toString() const {
         std::string str = "enum ";
-        str += iden->toString();
+        str += Name.data;
         str += " {\n";
-        for (size_t i = 0; i < u_data.size(); i++) {
+        for (size_t i = 0, size = udata.size(); i < size; i++) {
             if (i)
                 str += "\n";
 
-            str += u_data[i]->toString();
+            str += udata[i].data;
+            if(val[i]) {
+                str += " = ";
+                str += val[i]->toString();
+            }
             str += ",";
         }
         str += "}\n";
@@ -91,13 +70,12 @@ namespace ast {
         return tok.data;
     }
 
-    std::string TypeState::toString() const {
-        std::string str = "";
-        str += tok.data;
+    std::string TypeStmt::toString() const {
+        std::string str = "type";
         str += " ";
-        str += left->toString();
+        str += Ident.data;
         str += " ";
-        str += right->toString();
+        str += type->toString();
         str += ";";
         return str;
     }
@@ -119,16 +97,17 @@ namespace ast {
     }
 
 
-    std::string ArrayType::toString() const {
+    std::string Array::toString() const {
         std::string str = "";
+        str = "[";
         for(int i = 0 ; i < size.size(); i++){
-            str = "[";
             if(!size[i]){
 
             }
             str += size[i]->toString();
-            str += "]";
+            str += "; ";
         }
+        str += "]";
         str += type->toString();
         return str;
     }
@@ -140,15 +119,8 @@ namespace ast {
         return str;
     }
 
-    std::string AsState::toString() const {
-        std::string str = left->toString();
-        str += " as ";
-        str += right->toString();
-        return str;
-    }
-
     
-    std::string FunType::toString() const {
+    std::string FnType::toString() const {
         std::string str = "fn";
         str += "(";
         if(!ty.empty()){
@@ -163,58 +135,23 @@ namespace ast {
         }
         return str;
     }
+
     
-    std::string RefExpr::toString() const {
-        std::string str = tok.data;
+    std::string PrefixExpr::toString() const {
+        std::string str = "";
+        str += lex::token[op];
         str += base->toString();
         return str;
     }
-
-    std::string Path::toString() const {
-        std::string str = "";
-        str += lexpression()->toString();
-        str += "::";
-        str += rexpression()->toString();
-        str += "\n";
-        return str;
-    }
-
-
-    std::string IndexExpr::toString() const {
-        std::string str = "";
-        str += iden->toString();
-        str += "[";
-        for(int i = 0 ; i < index.size(); i++){
-            str += index[i]->toString();
-            str += ";";
-        }
-        str += "]";
-        return str;
-    }
-    
-    std::string BineryExpr::toString() const {
-        std::string str = "";
-        // str += " ( ";
-        str += left->toString();
-        str += lex::token[op];
-        str += right->toString();
-        // str += " ) ";
-        return str;
-    }
-    
-    std::string PrefixExper::toString() const {
-        std::string str = "";
-        str += lex::token[op];
-        str += var->toString();
-        return str;
-    }
     
     
-    std::string ForInLoop::toString() const {
+    std::string ForLoop::toString() const {
         std::string str = "for ";
-        str += left->toString();
-        str += " in ";
-        str += right->toString();
+        str += var->toString();
+        str += ";";
+        str += cond->toString();
+        str += ";";
+        str += incr->toString();
         str += " : {\n";
         str += body->toString();
         str += "}\n";
@@ -231,48 +168,49 @@ namespace ast {
     }
 
     
-    std::string IfStatement::toString() const {
+    std::string IfStmt::toString() const {
         std::string str = "if ";
         str += cond->toString();
         str += " {\n";
-        str +=  ifbody->toString();
+        str +=  ifblock->toString();
         str += " } ";
-        if(elbody){
+        if(elblock){
             str += "else ";
             str += " {\n";
-            str += elbody->toString();
+            str += elblock->toString();
             str += " }";
         }
         return str + "\n";
-    }
-    
-    std::string PointerExpr::toString() const {
-        std::string str = "*";
-        str += base->toString();
-        return str;
     }
     
     std::string BranchStmt::toString() const {
         return tok.data + ";\n";
     }
     
-    std::string MemberExpr::toString() const {
+    std::string Expression::toString() const {
         std::string str = "";
-        str += left->toString();
-        if(mem_op == DOT)
-            str += ".";
-        else
-            str += "->";
-        str += right->toString();
+        str += LHS->toString();
+        str += lex::token[Op];
+        str += RHS->toString();
         return str;
     }
     
     std::string StructStmt::toString() const {
         std::string str = "struct ";
-        str += iden->toString();
+        str += Name.data;
+        if(!Temp.empty()){
+            str += "<";
+            for(int i = 0 ; i < Temp.size(); i++){
+                str += Temp[i].data;
+                str += ",";
+            }
+            str += ">";
+        }
         str += "{\n";
-        for(int i = 0 ; i < elemt.size(); i++){
-            str += elemt[i]->toString();
+        for(int i = 0 ; i < elmtName.size(); i++){
+            str += elmtName[i].data;
+            str += ": ";
+            str += elmtTy[i]->toString();
             str += ",\n";
         }
         str += " };";
@@ -288,32 +226,16 @@ namespace ast {
         str += " ] ";
         return str;
     }
-    
-    std::string AssignmentExpr::toString() const {
-        std::string str = "";
-        str += left->toString();
-        str += tok.data;
-        str += right->toString();
-        str += ";\n";
-        return str;
-    }
-    
-    std::string Parameter::toString() const {
-        std::string str = "";
-        str += iden->toString();
-        str += " : ";
-        str += type->toString();
-        return str;
-    }
-    
+   
     std::string FunctionDef::toString() const {
         std::string str = "fn ";
-        str += name->toString();
+        str += Name.data;
         str += " ( ";
-        if(!param.empty()){
+        if(!pName.empty()){
          
-            for(size_t i = 0; i < param.size(); i++){
-                str += param[i]->toString();
+            for(size_t i = 0; i < pName.size(); i++){
+                str += pName[i].data;
+                str += pTy[i]->toString();
                 str += ",";
             }
         }
@@ -323,16 +245,21 @@ namespace ast {
             str += " -> ";
             str += retype->toString();
         }
-        if(body)
+        // if(AssociateTo) {
+        //     str += " for ";
+        //     str += AssociateTo->toString();
+        // }
+        if(Block)
         {    
             str += " {\n";
-            str += body->toString();
+            str += Block->toString();
             str += " }\n";
         }else{
             str += ";\n";
         }
         return str;
     }
+
 
     std::string ReturnStmt::toString() const {
         std::string res = "return ";
@@ -342,12 +269,6 @@ namespace ast {
         return res;
     }
 
-    std::string Variadic::toString() const {
-        std::string res = left->toString();
-        res += "..";
-        res += right->toString();
-        return res;
-    }
     
     std::string FunctionCall::toString() const {
         std::string res = "";
