@@ -30,9 +30,9 @@ void compile(){
    }
 
    parser::Parser p(toks,in);
-   ast::AstPtr tree = p.parse();
+   ast::Ast* tree = p.parse();
 
-   auto t = std::dynamic_pointer_cast<ast::BlockStatement>(tree);
+   auto t = static_cast<ast::BlockStmt*>(tree);
    // std::cout<<std::dynamic_pointer_cast<ast::WhileLoop>(t->statements()[0])->loopbody()->toString()<<std::endl;
    std::cout<<""<<t->getStmts().size()<<std::endl;
    std::cout<<" ->\n "<<tree->toString()<<std::endl;

@@ -32,6 +32,7 @@ namespace lex
         "if",
         "else",
         "struct",
+        "impl",
         "enum",
         "bool",
         "i8",
@@ -92,7 +93,7 @@ namespace lex
         ".",
         ";",
         ":",
-        "$",
+        "::",
         ",",
         "SPC",
         "TAB",
@@ -212,6 +213,7 @@ namespace lex
         toks.push_back(tokt(line, i - line_start , token[FEOF], FEOF));
         return true;
     }
+
     
     Token_type get_keyword(std::string &src) {
         if(src == token[FOR])return FOR;
@@ -223,6 +225,7 @@ namespace lex
         if(src == token[FN])return FN;
         if(src == token[SELF])return SELF;
         if(src == token[STRUCT])return STRUCT;
+        if(src == token[METHOD])return METHOD;
         if(src == token[NIL])return NIL;
         if(src == token[CONTINUE])return CONTINUE;
         if(src == token[BREAK])return BREAK;

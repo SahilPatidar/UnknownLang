@@ -1,0 +1,5 @@
+import std;
+
+fn(arg: i32, argv: **i8) -> i32 {
+    return 0;
+}

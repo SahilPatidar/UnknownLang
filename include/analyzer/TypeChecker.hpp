@@ -1,63 +1,63 @@
 #pragma once
-#include"analyzer/AstVisitor.hpp"
-#include"parser/type.hpp"
-#include"analyzer/symbol_table.hpp"
-
-namespace analyzer{
+#include"AstVisitor.hpp"
+#include"../parser/type.hpp"
+#include"symbol_table.hpp"
+#include"Value.hpp"
+// #include"analyzer/AstVisitor.hpp"
+// #include"parser/type.hpp"
+// #include"analyzer/symbol_table.hpp"
 
 using namespace ast;
-using TablePtr = std::shared_ptr<SymTable<TypePtr>>;
+namespace analyzer{
 
 class TypeChecker: public AstVisitor {
 private:
-    TablePtr Table;
-    TypePtr Type;
-    TypePtr retype = NULL;
-    TypePtr ResType;
+    Registry *Regmgr;
+    // Type* RetType;
+    Type* ResType;
+    // ast::VALUE* ResValue;
     bool isInField = false;
-    std::string identifier(const AstPtr& iden);
-    template<typename T>
-    T dynamicPtrCast(const AstPtr& iden);
-    TablePtr newTable(TablePtr globtable);
-    bool isValid(const TypePtr &type1, const TypePtr &type2);
-    bool checkTuple(TypePtr type, TypePtr node);
-    bool checkMemExpr(MemberExpr& AstNode);
 
-    bool checkStructExpr(MemberExpr node);
-    bool tupleAccessExpr(MemberExpr node);
+    bool CheckRHSInField(Ast *&Node, StructType *&StructTy);
+    bool CheckLHS(Ast *&Node, bool inField, StructType *type);
+    bool CheckImplicitTypeCast(Ast *Node, Type *&from, Type *&to);
 
-    bool visit(const Program& AstNode);
-    bool visit(const BlockStatement& AstNode );
-    bool visit(const FunctionDef& AstNode );
-    bool visit(const WhileLoop& AstNode );
-    bool visit(const ForInLoop& AstNode );
-    bool visit(const StructStmt& AstNode );
-    bool visit(const BranchStmt& AstNode );
-    bool visit(const Tuple& AstNode );
-    bool visit(const VarStmt& AstNode );
-    bool visit(const IfStatement& AstNode );
-    bool visit(const ReturnStmt& AstNode );
+    bool visit(BlockStmt* AstNode );
+    bool visit(FunctionDef* AstNode );
+    bool visit(WhileLoop* AstNode );
+    bool visit(ForLoop* AstNode );
+    bool visit(StructStmt* AstNode );
+    bool visit(Method* AstNode );
+    bool visit(EnumExpr *AstNode );
+    bool visit(BranchStmt* AstNode );
+    bool visit(VarStmt* AstNode );
+    bool visit(IfStmt* AstNode );
+    bool visit(ReturnStmt* AstNode );
     
-    bool visit(const BineryExpr& AstNode );
-    bool visit(const AssignmentExpr& AstNode );
-    bool visit(const ListExpr& AstNode ) ;
-    bool visit(const FunctionCall& AstNode );
-    bool visit(const Expression& AstNode );
-    bool visit(const IndexExpr& AstNode );
-    bool visit(const PrefixExper& AstNode );
+    bool visit(GroupedExpr* AstNode );
+    bool visit(Expression* AstNode );
+    bool visit(ListExpr* AstNode ) ;
+    bool visit(FunctionCall* AstNode );
+    bool visit( PostfixExpr* AstNode );
+    bool visit(PrefixExpr* AstNode );
 
-    bool visit(const PointerExpr& AstNode );
-    bool visit(const ArrayType& AstNode ) ;
-    bool visit(const PreDefineType& AstNode );
-    bool visit(const Identifier& AstNode );
+    bool visit(Array* AstNode ) ;
+    bool visit(FnType* AstNode );
+    bool visit(PreDefineType* AstNode );
+    bool visit(Identifier* AstNode );
 
-
-    bool visit(const FloatLiteral& AstNode );
-    bool visit(const BoolLiteral& AstNode );
-    bool visit(const NumericLiteral& AstNode );
-    bool visit(const NullLiteral& AstNode );
-    bool visit(const StringLiteral& AstNode );
+    bool visit(FloatLiteral* AstNode );
+    bool visit(BoolLiteral* AstNode );
+    bool visit(NumericLiteral* AstNode );
+    bool visit(NullLiteral* AstNode );
+    bool visit(StringLiteral* AstNode );
 public:
     TypeChecker();
+    ~TypeChecker();
 };
+
+
+
 }
+
+

@@ -7,41 +7,38 @@ class AstVisitor{
     public:
     virtual ~AstVisitor() = default;
 
-    virtual bool visit(const Program& astnode ){ return false; }
-    virtual bool visit(const BlockStatement& astnode ){ return false; }
-    virtual bool visit(const FunctionDef& astnode ){ return false; }
-    virtual bool visit(const WhileLoop& astnode ){ return false; }
-    virtual bool visit(const ForInLoop& astnode ){ return false; };
-    virtual bool visit(const StructStmt& astnode ){ return false; }
-    virtual bool visit(const BranchStmt& astnode ){ return false; }
-    virtual bool visit(const Tuple& astnode ){ return false; }
-    virtual bool visit(const VarStmt& astnode ){ return false; }
-    virtual bool visit(const IfStatement& astnode ){ return false; }
-    virtual bool visit(const ReturnStmt& astnode ){ return false; }
+    virtual bool visit(BlockStmt& AstNode){ return false; }
+    virtual bool visit(FunctionDef& AstNode ){ return false; }
+    virtual bool visit(WhileLoop& AstNode ){ return false; }
+    virtual bool visit(ForLoop& AstNode ){ return false; };
+    virtual bool visit(StructStmt& AstNode ){ return false; }
+    virtual bool visit(Method& AstNode ){ return false; }
+    virtual bool visit(BranchStmt& AstNode ){ return false; }
+    virtual bool visit(VarStmt& AstNode ){ return false; }
+    virtual bool visit(IfStmt& AstNode ){ return false; }
+    virtual bool visit(ReturnStmt& AstNode ){ return false; }
     
-    virtual bool visit(const BineryExpr& astnode ){ return false; }
-    virtual bool visit(const AssignmentExpr& astnode ){ return false; }
-    virtual bool visit(const ListExpr& astnode ) { return false; };
-    virtual bool visit(const FunctionCall& astnode ){ return false; }
-    virtual bool visit(const Expression& astnode ){ return false; }
-    virtual bool visit(const IndexExpr& astnode ){ return false; }
-    virtual bool visit(const PrefixExper& astnode ){ return false; }
-    virtual bool visit(const Parameter& astnode ){ return false; }
+    virtual bool visit(Expression& AstNode ){ return false; }
+    virtual bool visit(ListExpr& AstNode ) { return false; };
+    virtual bool visit(FunctionCall& AstNode ){ return false; }
+    virtual bool visit(Expression& AstNode ){ return false; }
+    virtual bool visit(PrefixExpr& AstNode ){ return false; }
+    virtual bool visit(PostfixExpr& AstNode ){ return false; }
     
-    virtual bool visit(const PointerExpr& astnode ){ return false; }
-    virtual bool visit(const ArrayType& astnode ) { return false; }
-    virtual bool visit(const PreDefineType& astnode ){ return false; }
-    virtual bool visit(const Identifier& astnode ){ return false; }
+    virtual bool visit(Array& AstNode ) { return false; }
+    virtual bool visit(FnType& AstNode ) { return false; }
+    virtual bool visit(PreDefineType& AstNode ){ return false; }
+    virtual bool visit(Identifier& AstNode ){ return false; }
     
 
-    virtual bool visit(const FloatLiteral& astnode ){ return false; }
-    virtual bool visit(const BoolLiteral& astnode ){ return false; }
-    virtual bool visit(const NumericLiteral& astnode ){ return false; }
-    virtual bool visit(const NullLiteral& astnode ){ return false; }
-    virtual bool visit(const StringLiteral& astnode ){ return false; }
+    virtual bool visit(FloatLiteral& AstNode ){ return false; }
+    virtual bool visit(BoolLiteral& AstNode ){ return false; }
+    virtual bool visit(NumericLiteral& AstNode ){ return false; }
+    virtual bool visit(NullLiteral& AstNode ){ return false; }
+    virtual bool visit(StringLiteral& AstNode ){ return false; }
     
-    //virtual bool visit(const TypeState& astnode ){ return false; }
-    //virtual bool visit(const EnumLitral& astnode ){ return false; }
+    //virtual bool visit(const TypeState& AstNode ){ return false; }
+    //virtual bool visit(const EnumLitral& AstNode ){ return false; }
 };
 
 }
