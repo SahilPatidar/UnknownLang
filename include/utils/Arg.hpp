@@ -4,11 +4,14 @@
 
 
 class Arg{
-    
+private:
+public:
 };
 
 class ArgParser{
+private:
 
+    
 };
 
 #endif

@@ -1,18 +1,19 @@
-#include"codegen/LLVMCodeGen.hpp"
+#include"../../include/codegen/LLVMCodeGen.hpp"
 #include"llvm/ADT/StringRef.h"
+#include<iostream>
 
 namespace codegen{
-    Value *IRCodegenVisitor::visit(const NumericLiteral &AstNode) {
-        return ConstantInt::get((Type::getInt32Ty(*TheContext)),
-                                      std::to_integer(AstNode.toString()));
+    Value *IRCodegenVisitor::visit(const ast::NumericLiteral &AstNode) {
+        return ConstantInt::get(Type::getInt32Ty(*TheContext),
+                                    std::to_integer(AstNode.toString()));
     }
 
-    Value *IRCodegenVisitor::visit(const FloatLiteral &AstNode) {
+    Value *IRCodegenVisitor::visit(const ast::FloatLiteral &AstNode) {
         return ConstantFP::get(*TheContext,
                                       APFoat(std::to_integer(AstNode.toString())));
     }
 
-    Value *IRCodegenVisitor::visit(const BoolLiteral &AstNode) {
+    Value *IRCodegenVisitor::visit(const ast::BoolLiteral &AstNode) {
         switch (AstNode.token().tok_type)
         {
         case TRUE:
@@ -25,11 +26,11 @@ namespace codegen{
         return nullptr;
     }
 
-    Value *IRCodegenVisitor::visit(const StringLiteral &AstNode) {
+    Value *IRCodegenVisitor::visit(const ast::StringLiteral &AstNode) {
         return ConstantDataSequance::get(*TheContext, APFloat(std::to_integer(AstNode.tok.data)));
     }
     
-    Value *IRCodegenVisitor::visit(const PreDefineType &AstNode) {
+    Value *IRCodegenVisitor::visit(const ast::PreDefineType &AstNode) {
         switch (AstNode.getType())
         {
         case I8:
@@ -56,7 +57,7 @@ namespace codegen{
         return nullptr;
     }
 
-    Value *IRCodegenVisitor::visit(const BineryExpr &AstNode) {
+    Value *IRCodegenVisitor::visit(const ast::BineryExpr &AstNode) {
         Value *L = AstNode.left()->accept(*this);
         Value *R = AstNode.right()->accept(*this);
         if (!L || !R)
@@ -88,13 +89,13 @@ namespace codegen{
     }
 
 }
-Value *IRCodegenVisitor::visit(const BlockStatement &AstNode) {
+Value *IRCodegenVisitor::visit(const ast::BlockStatement &AstNode) {
     for(int i = 0, siz = AstNode.getStmts().size(); i < siz; i++) {
 
     }
 }
 
-Value *IRCodegenVisitor::visit(const IfStatement &AstNode) {
+Value *IRCodegenVisitor::visit(const ast::IfStatement &AstNode) {
     Value *CondV = AstNode.getCondV()->accept(*this);
     if(!CondV) 
         return nullptr;
@@ -103,7 +104,7 @@ Value *IRCodegenVisitor::visit(const IfStatement &AstNode) {
 
 }
 
-Function *IRCodegenVisitor::getFunctionType(const FunctionDef &Func) {
+Function *IRCodegenVisitor::getFunctionType(const ast::FunctionDef &Func) {
     Type *ResultTy = Func.getResultType()->accept(*this);
     std::vector<Type *>Params;
     for(size_t i = 0, siz = Func.getParameter().size(); i < siz; i++) {
@@ -121,49 +122,47 @@ Function *IRCodegenVisitor::getFunctionType(const FunctionDef &Func) {
     return Func;
 }
 
-Value *IRCodegenVisitor::visit(const FunctionDef &AstNode) {
-    // FunctionType *FuncTy = getFunctionType(AstNode);
-    // Function *Func = Function::Create(FuncTy, Function::ExternalLinkage,
-    //                                 AstNode.getFuncName()->toString(), TheModule->get());
-    //  // Set names for all arguments.
-    // unsigned Idx = 0;
-    // for (auto &Arg : Func->args())
-    //     Arg.setName(AstNode.getParameterNames()[Idx++].toString());
+Value *IRCodegenVisitor::visit(const ast::FunctionDef &AstNode) {
+    FunctionType *FuncTy = getFunctionType(AstNode);
+    Function *Func = Function::Create(FuncTy, Function::ExternalLinkage,
+                                    AstNode.getFuncName()->toString(), TheModule->get());
+     // Set names for all arguments.
+    unsigned Idx = 0;
+    for (auto &Arg : Func->args())
+        Arg.setName(AstNode.getParameterNames()[Idx++].toString());
 
 
 
-    // BasicBlock *Block = BasicBlock::create(TheContext, "entry", Func, nullptr);
-
-
+    BasicBlock *Block = BasicBlock::create(TheContext, "entry", Func, nullptr);
 
     Function *TheFunction = TheModule->getFunction(Proto->getName());
 
-  if (!TheFunction)
-    TheFunction = Proto->codegen();
+    if (!TheFunction)
+        TheFunction = Proto->codegen();
 
-  if (!TheFunction)
-    return nullptr;
+    if (!TheFunction)
+        return nullptr;
 
-  // Create a new basic block to start insertion into.
-  BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
-  Builder.SetInsertPoint(BB);
+    // Create a new basic block to start insertion into.
+    BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
+    Builder.SetInsertPoint(BB);
 
-  // Record the function arguments in the NamedValues map.
-  NamedValues.clear();
-  for (auto &Arg : TheFunction->args())
-    NamedValues[Arg.getName()] = &Arg;
+    // Record the function arguments in the NamedValues map.
+    NamedValues.clear();
+    for (auto &Arg : TheFunction->args())
+        NamedValues[Arg.getName()] = &Arg;
 
-  if (Value *RetVal = Body->codegen()) {
-    // Finish off the function.
-    Builder.CreateRet(RetVal);
+    if (Value *RetVal = Body->codegen()) {
+        // Finish off the function.
+        Builder.CreateRet(RetVal);
 
-    // Validate the generated code, checking for consistency.
-    verifyFunction(*TheFunction);
+        // Validate the generated code, checking for consistency.
+        verifyFunction(*TheFunction);
 
+    }
 }
-}
 
-Value *IRCodegenVisitor::visit(const FunctionCall &AstNode) {
+Value *IRCodegenVisitor::visit(const ast::FunctionCall &AstNode) {
     Function *CalleeF = TheModule->getFunction(AstNode.name());
     if(!CalleeF) {
         //todo
@@ -183,7 +182,7 @@ Value *IRCodegenVisitor::visit(const FunctionCall &AstNode) {
 
 
 
-Value *IRCodegenVisitor::visit(const StructStmt &AstNode) {
+Value *IRCodegenVisitor::visit(const ast::StructStmt &AstNode) {
     StructType *treeType = StructType::create(*TheContext, StringRef(AstNode.name()->toString()));
     std::ArrayRef<Type *>ele;
     for(size_t i = 0, siz = AstNode.getIdentList().size(); i < siz; i++) {
@@ -196,7 +195,7 @@ Value *IRCodegenVisitor::visit(const StructStmt &AstNode) {
     return treeType;
 }
 
-Value* IRCodegenVisitor::visit(const VarStmt &AstNode) {
+Value* IRCodegenVisitor::visit(const ast::VarStmt &AstNode) {
     switch(AstNode.getVal()->nodeCategory()) {
         case NodeFNStm:
         {
@@ -226,7 +225,7 @@ Value* IRCodegenVisitor::visit(const VarStmt &AstNode) {
     return Var;
 }
 
-Value *IRCodegenVisitor::visit(const ArrayTy &AstNode) {
+Value *IRCodegenVisitor::visit(const ast::Array &AstNode) {
     Type *EleType = AstNode.arrType()->accept(*this);
     if(!eleType){
         
@@ -241,7 +240,7 @@ Value *IRCodegenVisitor::visit(const ArrayTy &AstNode) {
     return arrType;
 }
 
-Value *IRCodegenVisitor::visit(const Expression &AstNode) {
+Value *IRCodegenVisitor::visit(const ast::Expression &AstNode) {
     switch (AstNode.nodeCategory())
     {
     case NodeMemExpr:

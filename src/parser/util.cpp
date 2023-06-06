@@ -6,48 +6,27 @@ namespace parser {
     void ParserHelper::next() {
         if(CurrentIndex + 1 < toks.size()) {
             ++CurrentIndex;
-            CurrentToken = toks[CurrentIndex].tok_type;
         }
     }
 
     inline bool ParserHelper::checkNH(Token_type tok, int i){
-        return toks[CurrentIndex+i].tok_type == tok;
+        return at_tt(i) == tok;
     }
 
     void ParserHelper::dump(std::string msg){
-        std::cout<<"step :: "<<"entering in -> "<<msg<<" "<<toks[CurrentIndex].data<<std::endl;
+        std::cout<<"step :: "<<"entering in -> "<<msg<<" "<<peek_l().getStr()<<std::endl;
     }
     void ParserHelper::dump2(std::string msg){
-        std::cout<<"step :: "<<"returning from -> "<<msg<<" "<<toks[CurrentIndex].data<<std::endl;
+        std::cout<<"step :: "<<"returning from -> "<<msg<<" "<<peek_l().getStr()<<std::endl;
     }
 
-    inline bool ParserHelper::ArithmeticOP(Token_type tok) {
-        return tok == STAR || tok == DIV || tok == MOD ||
-                                 tok == MINUS || tok == PLUS;
-    } 
-
-    inline bool ParserHelper::ConditionalOP(Token_type tok) {
-        return tok == LT || tok == LEQL || tok == GT || 
-                tok == GEQL || tok == EQL || tok == NEQL ||
-                                    tok == AND ||  tok == OR;
-    }  
-
-    inline bool ParserHelper::LogicalOP(Token_type tok) {
-        return tok == LSHIFT || tok == RSHIFT || 
-                    tok == AND || tok == XOR_OP || 
-                        tok == AND_OP || tok == OR_OP;
-    }  
-
-    inline bool ParserHelper::BinaryOP(Token_type tok) {
-        return ArithmeticOP(tok)||ConditionalOP(tok)||LogicalOP(tok);
-    } 
 
     inline bool ParserHelper::check(Token_type tok) {
-        return CurrentToken == tok;
+        return peek_tt() == tok;
     }
 
     inline bool ParserHelper::checkn(Token_type tok) {
-        if(CurrentToken == tok){
+        if(peek_tt() == tok){
             next();
             return true;
         }
@@ -55,35 +34,45 @@ namespace parser {
     }
 
     inline bool ParserHelper::checkh(Token_type tok) {
-        return next_t().tok_type == tok;
+        return next_tt() == tok;
     }
 
-    tokt ParserHelper::next_t() {
+    Lexeme ParserHelper::next_l() {
         return (CurrentIndex+1 < toks.size())?toks[CurrentIndex+1]:toks[CurrentIndex];
     }
 
-    bool ParserHelper::UnaryOP(Token_type tok) {
-        return tok == PLUS|| tok == MINUS||
-         tok == STAR|| tok == AND_OP||tok == NOT_OP|| tok == NOT;
+    Tok ParserHelper::next_t() {
+        return next_l().getTok();
     }
 
-    bool ParserHelper::AssignOP(Token_type tok){
-        return tok == ASSN|| tok == ASSN_DIV||
-         tok == ASSN_MINUS|| tok == ASSN_MOD||tok == ASSN_PLUS|| tok == ASSN_STAR|| 
-         tok == AND_ASSN|| tok == XOR_ASSN||tok == OR_ASSN|| tok == NOT_ASSN;
-    }
-    
-    bool ParserHelper::PreDefType(Token_type tok){
-        return tok == I8 || tok == I16 ||
-         tok == I32 || tok == I64 || tok == UI8 || tok == UI16 ||
-         tok == UI32 || tok == UI64 || tok == F32 || tok == F64 ||
-         tok == BOOL;
+    Token_type ParserHelper::next_tt() {
+        return next_t().getTokType();
     }
 
-    bool ParserHelper::isTerminal(Token_type tok){
-        return tok == RPAREN || tok == COMMA ||
-         tok == RBRACE || tok == RBRACK || tok == COL || tok == SCOL;
+    Lexeme ParserHelper::peek_l() {
+        return toks[CurrentIndex];
     }
+
+    Tok ParserHelper::peek_t() {
+        return peek_l().getTok();
+    }
+
+    Token_type ParserHelper::peek_tt() {
+        return peek_t().getTokType();
+    }
+
+    Lexeme ParserHelper::at(int i) {
+        return i < toks.size()?toks[i]:toks[toks.size()-1];
+    }
+
+    Tok ParserHelper::at_t(int i) {
+        return at(i).getTok();
+    }
+
+    Token_type ParserHelper::at_tt(int i) {
+        return at_t(i).getTokType();
+    }
+
 
     int ParserHelper::preced(Token_type op){
         switch (op)
@@ -125,26 +114,24 @@ namespace parser {
             return 6;
         case AND:
             return 5;
-        case XOR_OP:
+        case XOR:
             return 4;
         case OR:
             return 3;    
-        case AND_OP:
+        case CND_AND:
             return 2;  
-        case OR_OP:
+        case CND_OR:
             return 1;
-        case ASSN: case ASSN_DIV: case ASSN_MINUS: case ASSN_MOD: 
-        case ASSN_PLUS: case ASSN_STAR: case AND_ASSN: case XOR_ASSN: 
-        case OR_ASSN: case NOT_ASSN:
+        case ASN: case ASN_DIV: case ASN_MINUS: case ASN_MOD: 
+        case ASN_PLUS: case ASN_STAR: case ASN_AND: case ASN_XOR: 
+        case ASN_OR: case ASN_NOT:
         default:
             break;
         }
         return 0;
     }
 
-    bool ParserHelper::isLiteral(Token_type tok) {
-        return tok == INT||tok == STR||tok == CHAR|| tok == FLOAT||tok == TRUE||tok == FALSE||tok == NIL;
-    }
+
 
 
 }

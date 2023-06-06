@@ -10,15 +10,15 @@ namespace parser
 using namespace ast;
 
 
-bool Parser::ParseBlock(ParserHelper &P, Ast *&ResultantNode, bool isBrace){
+bool Parser::ParseBlock(ParserHelper &P, Ast *&ResultantNode, bool isGlob){
     std::vector<Ast*>stmts;
-    if(isBrace&&!P.checkn(LBRACE)){
-        err::out("expected '{' found",P.toks[P.CurrentIndex]);
+    if(!isGlob&&!P.checkn(LBRACE)){
+        err::out("expected '{' found",P.peek_l());
         return false;
     }
-    while(!P.check(FEOF)&&(!isBrace&&!P.check(RBRACE))) {
+    while(!P.check(FEOF)&&!P.check(RBRACE)) {
         bool isSemiCol = false;
-        switch(P.CurrentToken){ 
+        switch(P.peek_tt()){ 
         case IF:
             if(!ParseIfStmt(P, ResultantNode)){ return false; }
             break;
@@ -57,12 +57,44 @@ bool Parser::ParseBlock(ParserHelper &P, Ast *&ResultantNode, bool isBrace){
             }
         }
             break;
+        case MOD:
+        {
+            if(!ParseMod(P, ResultantNode)){ return false; }
+            isSemiCol = true;
+        }
+        break;
         case WHILE:
-            if(!ParseWhileStmt(P, ResultantNode)){ return false;}
+            if(!ParseWhileStmt(P, ResultantNode)){ return false; }
             break;
         case LET:
+        {
+            if(isGlob) { 
+                err::out("consider using `const` or `static` instead of `let` for global variables",P.peek_l());
+                return false;
+            }
             if(!ParseVarStmt(P, ResultantNode)){ return false; }
             isSemiCol = true;
+        }
+            break;
+        case CONST:
+        {
+            if(isGlob) { 
+                err::out("consider using `const` or `static` instead of `let` for global variables",P.peek_l());
+                return false;
+            }
+            if(!ParseVarStmt(P, ResultantNode)){ return false; }
+            isSemiCol = true;
+        }
+            break;
+        case STATIC:
+        {
+            if(isGlob) { 
+                err::out("consider using `const` or `static` instead of `let` for global variables",P.peek_l());
+                return false;
+            }
+            if(!ParseVarStmt(P, ResultantNode)){ return false; }
+            isSemiCol = true;
+        }
             break;
 
         case RETURN:
@@ -72,7 +104,7 @@ bool Parser::ParseBlock(ParserHelper &P, Ast *&ResultantNode, bool isBrace){
 
         case CONTINUE:
         case BREAK:
-            stmts.push_back(BranchStmt::Create(P.toks[P.CurrentIndex]));
+            stmts.push_back(BranchStmt::Create(P.peek_l()));
             P.next();
             isSemiCol = true;
             break;
@@ -89,13 +121,13 @@ bool Parser::ParseBlock(ParserHelper &P, Ast *&ResultantNode, bool isBrace){
             break;
         }
         if(isSemiCol&&!P.checkn(SCOL)){
-            err::out("expected ';' found - ",P.toks[P.CurrentIndex]);
+            err::out("expected ';' found - ",P.peek_l());
             return false;
         }
         stmts.push_back(ResultantNode);
     }
-    if(isBrace&&!P.checkn(RBRACE)){
-        err::out("expected '}' found",P.toks[P.CurrentIndex]);
+    if(!isGlob&&!P.checkn(RBRACE)){
+        err::out("expected '}' found",P.peek_l());
         return false;
     }
     ResultantNode = BlockStmt::Create(stmts);
@@ -103,22 +135,49 @@ bool Parser::ParseBlock(ParserHelper &P, Ast *&ResultantNode, bool isBrace){
 }
 
 
+bool Parser::ParseUseStmt(ParserHelper &P, Ast *&ResultantNode) {
+    Lexeme L = P.peek_l();
+    p.next();
+    if()
+    return true;
+}
+
+bool Parser::ParseMod(ParserHelper &P, Ast *&ResultantNode) {
+    P.next();
+    if(!P.check(IDEN)) {
+        err::out("expected `mod identifier` found",P.peek_l());
+        return false;
+    }
+    
+    module::ModuleBuilder mb;
+    std::string path = mod.modinfo.dirpath;
+    module::Module mod; 
+    mb.buildMod(path, P.peek_l().getStr());
+    return true;
+}
+
+
+
+
 bool Parser::ParseMethod(ParserHelper &P, Ast *&ResultantNode) {
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     Ast* Assoc;
     std::vector<Ast*> Impl;
     P.next();
     if(!P.check(IDEN)){
-        err::out("expected 'identifier' with method statement found - ",P.toks[P.CurrentIndex]);
+        err::out("expected 'identifier' with method statement found - ",P.peek_l());
         return false;
     }
-    tokt Name = P.toks[P.CurrentIndex];
+    if(!ParseExpr(P,ResultantNode)){
+        return false;
+    }
+    Ast* Name = ResultantNode;
     P.next();
     if(P.check(FOR)){
         ///@todo
     }
     if(!P.checkn(LBRACE)) {
-        err::out("expected '{' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected '{' found - ",P.peek_l());
         return false;
     }
 
@@ -130,7 +189,7 @@ bool Parser::ParseMethod(ParserHelper &P, Ast *&ResultantNode) {
     }
 
     if(!P.checkn(RBRACE)) {
-        err::out("expected '}' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected '}' found - ",P.peek_l());
         return false;
     }
     ResultantNode = Method::Create(tok, Name, Assoc, Impl);
@@ -139,19 +198,18 @@ bool Parser::ParseMethod(ParserHelper &P, Ast *&ResultantNode) {
 
 
 bool Parser::ParseWhileStmt(ParserHelper &P, Ast *&ResultantNode) {
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     Ast* Cond;
     P.next();
     if(P.check(LBRACE)){
-        err::out("expected condition expression found - ",P.toks[P.CurrentIndex]);
+        err::out("expected condition expression found - ",P.peek_l());
         return false;
     }
     if(!ParseExpr(P, ResultantNode)) {
         return false;
     }
     Cond = ResultantNode;
-    bool isBrace = true;
-    if(!ParseBlock(P,ResultantNode,isBrace)){
+    if(!ParseBlock(P,ResultantNode,false)){
         return false;
     }
     ResultantNode = WhileLoop::Create(tok,Cond,ResultantNode);
@@ -161,7 +219,7 @@ bool Parser::ParseWhileStmt(ParserHelper &P, Ast *&ResultantNode) {
 
 bool Parser::ParseReturnStmt(ParserHelper &P, Ast *&ResultantNode) {
     P.dump(__func__);
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     Ast* val;
     P.next();
 
@@ -172,7 +230,7 @@ bool Parser::ParseReturnStmt(ParserHelper &P, Ast *&ResultantNode) {
         val = ResultantNode;
     }
     if(!P.checkn(SCOL)){
-            err::out("expected ';' found -> ",P.toks[P.CurrentIndex]);
+            err::out("expected ';' found -> ",P.peek_l());
             return false;
     }
 
@@ -187,7 +245,7 @@ bool Parser::ParseReturnStmt(ParserHelper &P, Ast *&ResultantNode) {
 bool Parser::ParseType(ParserHelper &P, Ast *&ResultantNode) {
     //Ast* type;
     P.dump(__func__);
-    switch(P.CurrentToken){
+    switch(P.peek_tt()){
         case LBRACK:
             if(!ParseArrayType(P,ResultantNode)){
                 return false;
@@ -204,13 +262,13 @@ bool Parser::ParseType(ParserHelper &P, Ast *&ResultantNode) {
         case F32:
         case F64:
         case BOOL:
-            ResultantNode = PreDefineType::Create(P.toks[P.CurrentIndex]);
+            ResultantNode = PreDefineType::Create(P.peek_l());
             P.next();
             break;
         case CONST:
         {
-            tokt tok = P.toks[P.CurrentIndex];
-            Token_type Op = P.CurrentToken;
+            Lexeme tok = P.peek_l();
+            Tok Op = P.peek_t();
             bool isType = true;
             P.next();
             if(!ParseType(P,ResultantNode)){
@@ -222,10 +280,10 @@ bool Parser::ParseType(ParserHelper &P, Ast *&ResultantNode) {
             break;
         case FN:
         {
-            tokt tok = P.toks[P.CurrentIndex];
+            Lexeme tok = P.peek_l();
             P.next();
             if(!P.check(LPAREN)){
-                err::out("expected '{' found -> ",P.toks[P.CurrentIndex]);
+                err::out("expected '{' found -> ",P.peek_l());
                 return false;
             }else{
                 P.next();
@@ -240,7 +298,7 @@ bool Parser::ParseType(ParserHelper &P, Ast *&ResultantNode) {
                     }
                 }
                 if(!P.checkn(RPAREN)) {
-                    err::out("expected ')' found -> ",P.toks[P.CurrentIndex]);
+                    err::out("expected ')' found -> ",P.peek_l());
                     return false;
                 }
                 Ast* ret;
@@ -262,8 +320,8 @@ bool Parser::ParseType(ParserHelper &P, Ast *&ResultantNode) {
         case STAR:
         {
             bool isType  = true;
-            tokt tok  = P.toks[P.CurrentIndex];
-            Token_type op = P.CurrentToken;
+            Lexeme tok  = P.peek_l();
+            Tok op = P.peek_t();
             int DefCount = 0;
             P.next();
             while(P.checkn(STAR)){
@@ -272,7 +330,7 @@ bool Parser::ParseType(ParserHelper &P, Ast *&ResultantNode) {
             if(!ParseType(P,ResultantNode)){
                 return false;
             }
-            ResultantNode = PrefixExpr::Create(tok,op,ResultantNode,isType,DefCount,NodePtr);
+            ResultantNode = PrefixExpr::Create(tok,op,ResultantNode,isType,DefCount,NodePtrTy);
         }
             break;
         case SELF:
@@ -283,7 +341,7 @@ bool Parser::ParseType(ParserHelper &P, Ast *&ResultantNode) {
         }
         break;
         default:
-            err::out("expected 'type' found ->",P.toks[P.CurrentIndex]);
+            err::out("expected 'type' found ->",P.peek_l());
             return false;
     }
             P.dump2(__func__);
@@ -292,11 +350,11 @@ bool Parser::ParseType(ParserHelper &P, Ast *&ResultantNode) {
 
 
 bool Parser::ParseArrayType(ParserHelper &P, Ast *&ResultantNode) {
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     std::vector<Ast*>size;
     P.next();
     if(P.check(RBRACK)) {
-        err::out("expected ']' found ->",P.toks[P.CurrentIndex]);
+        err::out("expected ']' found ->",P.peek_l());
         return false;
     }
     while(P.check(RBRACK)) {
@@ -309,7 +367,7 @@ bool Parser::ParseArrayType(ParserHelper &P, Ast *&ResultantNode) {
         }
     }
     if(!P.checkn(RBRACK)) {
-        err::out("expected ']' found ->",P.toks[P.CurrentIndex]);
+        err::out("expected ']' found ->",P.peek_l());
         return false;
     }
     if(!ParseType(P,ResultantNode)){
@@ -321,16 +379,16 @@ bool Parser::ParseArrayType(ParserHelper &P, Ast *&ResultantNode) {
 
 
 bool Parser::ParseTypeStatm(ParserHelper &P, Ast *&ResultantNode){
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     P.next();
     if(!P.check(IDEN)){
-        err::out("expected 'identifier' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected 'identifier' found - ",P.peek_l());
         return false;
     }
-    tokt Ident = P.toks[P.CurrentIndex];
+    Lexeme Ident = P.peek_l();
     P.next();
-    if(!P.checkn(ASSN)){
-        err::out("expected '=' found - ",P.toks[P.CurrentIndex]);
+    if(!P.checkn(ASN)){
+        err::out("expected '=' found - ",P.peek_l());
         return false;
     }
 
@@ -343,12 +401,12 @@ bool Parser::ParseTypeStatm(ParserHelper &P, Ast *&ResultantNode){
 
 
 bool Parser::ParseCall(ParserHelper &P, Ast *&ResultantNode) {
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     Ast* sig = ResultantNode;
     std::vector<Ast*>args;
 
     if(!P.checkn(LPAREN)){
-        err::out("expected '(' found - ", P.toks[P.CurrentIndex]);
+        err::out("expected '(' found - ", P.peek_l());
         return false;
     }
 
@@ -368,7 +426,7 @@ bool Parser::ParseCall(ParserHelper &P, Ast *&ResultantNode) {
     }
 
     if(!P.checkn(RPAREN)){
-        err::out("expected ')' found - ", P.toks[P.CurrentIndex]);
+        err::out("expected ')' found - ", P.peek_l());
         return false;
     }
     ResultantNode = FunctionCall::Create(tok,sig,args);
@@ -377,7 +435,7 @@ bool Parser::ParseCall(ParserHelper &P, Ast *&ResultantNode) {
 
 
 bool Parser::ParseListExpr(ParserHelper &P, Ast *&ResultantNode) {
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     P.next();
     std::vector<Ast*>List;
     while(!P.check(RBRACK)) {
@@ -390,7 +448,7 @@ bool Parser::ParseListExpr(ParserHelper &P, Ast *&ResultantNode) {
         }
     }
     if(!P.checkn(RBRACK)){
-        err::out("expected ']' found - ", P.toks[P.CurrentIndex]);
+        err::out("expected ']' found - ", P.peek_l());
         return false;
     }
     ResultantNode = ListExpr::Create(tok, List);
@@ -400,8 +458,8 @@ bool Parser::ParseListExpr(ParserHelper &P, Ast *&ResultantNode) {
 
 bool Parser::ParseCastExpr(ParserHelper &P, Ast *&ResultantNode) {
     Ast* LHS = ResultantNode;
-    tokt tok = P.toks[P.CurrentIndex];
-    Token_type op = P.CurrentToken;
+    Lexeme tok = P.peek_l();
+    Tok op = P.peek_t();
     Ast* RHS;
     while(P.checkn(AS)){
         if(!ParseType(P,ResultantNode)){
@@ -412,58 +470,6 @@ bool Parser::ParseCastExpr(ParserHelper &P, Ast *&ResultantNode) {
     return true;
 }
 
-
-bool Parser::ParsePrefixExpr(ParserHelper &P, Ast *&ResultantNode, KindExpression Expr) {
-    tokt tok = P.toks[P.CurrentIndex];
-    Token_type op = P.CurrentToken;
-    NodeCategory NodeKind;
-    bool isType = false;
-    int DefCount = 0;
-    if(P.checkn(STAR)) {
-        DefCount = 0;
-        while(P.checkn(STAR)){
-            DefCount++;
-        }
-        if(P.check(AND_OP)){
-            if(!ParsePrefixExpr(P,ResultantNode,Expr)){
-                return false;
-            }
-        }else if(P.check(IDEN) || P.check(LPAREN)){
-            if(!ParseExpr3(P,ResultantNode,Expr)){
-                return false;
-            }
-        }else {
-            err::out("invalid expression with operator - ", P.toks[P.CurrentIndex]);
-            return false;
-        }
-        NodeKind = NodePtr;
-    }else if(P.checkn(AND_OP)) {
-        if(P.check(IDEN)||P.check(LPAREN)){
-            if(!ParseExpr3(P,ResultantNode,Expr)){
-                return false;
-            }
-        }else if(P.check(LBRACK)) {
-            if(!ParseListExpr(P,ResultantNode)){
-                return false;
-            }
-        }else {
-            err::out("invalid expression with operator - ", P.toks[P.CurrentIndex]);
-            return false;
-        }
-        NodeKind - NodeRef;
-    }else if(P.checkn(PLUS)||P.checkn(MINUS)||P.checkn(NOT)||P.checkn(NOT_OP)) {
-        if(!P.check(IDEN)&&!P.check(LPAREN)&&!P.isLiteral(P.CurrentToken)){
-            err::out("invalid expression with operator - ", P.toks[P.CurrentIndex]);
-            return false;
-        }
-        if(!ParseExpr(P, ResultantNode)){
-            return false;
-        }
-        NodeKind = NodePrefix;
-    }
-    ResultantNode = PrefixExpr::Create(tok,op,ResultantNode, isType, DefCount, NodeKind);
-    return true;
-}
 
 bool Parser::ParseExpr(ParserHelper &P, Ast *&ResultantNode) {
     int Precedance = 0;
@@ -476,45 +482,13 @@ bool Parser::ParseExpr(ParserHelper &P, Ast *&ResultantNode) {
 
 
 
-
-
-
-
 bool Parser::ParseExpr1(ParserHelper &P, Ast *&ResultantNode, int Precedance) { 
-    KindExpression Expr;
-    if(!ParseExpr2(P, ResultantNode, Expr)){
+    if(!ParseExpr2(P, ResultantNode)){
         return false;
     }
-    if(P.ArithmeticOP(P.CurrentToken)) {
-        if(Expr == KExpr_ArrayInit || Expr == KExpr_StructInit || Expr == KExpr_DotDot){
-            err::out("Arithmetic operation not allowed with - ",P.toks[P.CurrentIndex]);
-            return false;
-        }
-        if(!ParseBinaryExpr(P,ResultantNode,Precedance)) {
-            return false;
-        }
-    }else if(P.LogicalOP(P.CurrentToken)) {
-        if(Expr == KExpr_ArrayInit || Expr == KExpr_StructInit || Expr == KExpr_DotDot){
-            err::out("Logical operation not allowed with - ",P.toks[P.CurrentIndex]);
-            return false;
-        }
-        if(!ParseBinaryExpr(P,ResultantNode,Precedance)) {
-            return false;
-        }
+    Tok t = P.peek_t();
+    if(t.IsBinaryOP()||t.IsAssignOP()) {
 
-    }if(P.ConditionalOP(P.CurrentToken)) {
-        if(Expr == KExpr_ArrayInit || Expr == KExpr_StructInit || Expr == KExpr_DotDot){
-            err::out("Conditional operation not allowed with - ",P.toks[P.CurrentIndex]);
-            return false;
-        }
-        if(!ParseBinaryExpr(P,ResultantNode,Precedance)) {
-            return false;
-        }
-    }else if(P.AssignOP(P.CurrentToken)) {
-        if(Expr == KExpr_ArrayInit || Expr == KExpr_StructInit || Expr == KExpr_DotDot){
-            err::out("Assignment operation not allowed with - ",P.toks[P.CurrentIndex]);
-            return false;
-        }
         if(!ParseBinaryExpr(P,ResultantNode,Precedance)) {
             return false;
         }
@@ -522,26 +496,45 @@ bool Parser::ParseExpr1(ParserHelper &P, Ast *&ResultantNode, int Precedance) {
     return true;
 }
 
-bool Parser::ParseExpr2(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) { 
-    if(!ParseExpr3(P, ResultantNode, Expr)){
+bool Parser::ParseExpr2(ParserHelper &P, Ast *&ResultantNode) { 
+    if(!ParseExpr3(P, ResultantNode)){
         return false;
     }
 
     if(P.check(AS)) {
-
+        if(!ParseCastExpr(P,ResultantNode)){
+            return false;
+        }
     }
     
     return true;
 }
 
-bool Parser::ParseExpr3(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) { 
-    if(P.check(STAR)) {
-
-    }else if(P.check(AND_OP)) {
-
-    }else if(P.check(PLUS)||P.check(MINUS)) {
-
-    }if(!ParseExpr3(P, ResultantNode, Expr)) {
+bool Parser::ParseExpr3(ParserHelper &P, Ast *&ResultantNode) { 
+    Lexeme tok = P.peek_l();
+    Tok op = P.peek_t();
+    if(op.IsUnaryOP()){
+        if(P.check(STAR)) {
+            int defCount = 1;
+            while(P.checkn(STAR)){
+                defCount++;
+            }
+            if(!ParseExpr3(P,ResultantNode)){
+                return false;
+            }
+            ResultantNode = PrefixExpr::Create(tok, op, ResultantNode, false, defCount, NodeDeref);
+        }else if(P.check(AND)) {
+            if(!ParseExpr3(P,ResultantNode)){
+                return false;
+            }
+            ResultantNode = PrefixExpr::Create(tok, op, ResultantNode, false, 0, NodeRef);
+        }else if(P.check(PLUS)||P.check(MINUS)) {
+            if(!ParseExpr3(P,ResultantNode)){
+                return false;
+            }
+            ResultantNode = PrefixExpr::Create(tok, op, ResultantNode, false, 0, NodePrefix);
+        }
+    }else if(!ParseExpr4(P, ResultantNode)) {
         return false;
     }
 
@@ -551,21 +544,13 @@ bool Parser::ParseExpr3(ParserHelper &P, Ast *&ResultantNode, KindExpression &Ex
 
 
 
-
-
-bool Parser::ParseExpr4(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) {
-    if(!ParseExpr5(P,ResultantNode, Expr)){
+bool Parser::ParseExpr4(ParserHelper &P, Ast *&ResultantNode) {
+    if(!ParseExpr5(P,ResultantNode)){
         return false;
     }
 
     if(P.check(DOT) || P.check(ARROW)){
-        if(Expr == KExpr_StructInit || Expr == KExpr_Literal ||
-            Expr == KExpr_ArrayInit || Expr == KExpr_DotDot || 
-            Expr == KExpr_Binary) {
-            err::out("Member Access operation not allowed with - ",P.toks[P.CurrentIndex]);
-            return false;
-        }
-        if(!ParseDotArrowExpr(P, ResultantNode, Expr)) {
+        if(!ParseDotArrowExpr(P, ResultantNode)) {
             return false;
         }
     }
@@ -574,30 +559,21 @@ bool Parser::ParseExpr4(ParserHelper &P, Ast *&ResultantNode, KindExpression &Ex
     return true;
 }
 
-bool Parser::ParseExpr5(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) {
-    if(!ParseExpression(P, ResultantNode, Expr)){
+bool Parser::ParseExpr5(ParserHelper &P, Ast *&ResultantNode) {
+    if(!ParseExpr6(P, ResultantNode)){
         return false;
     }
 
     if(P.check(LPAREN) || P.check(LBRACK)){
-        if(Expr == KExpr_StructInit || Expr == KExpr_Literal ||
-            Expr == KExpr_ArrayInit || Expr == KExpr_DotDot || 
-            Expr == KExpr_Binary) {
-            err::out("Member Access operation not allowed with - ",P.toks[P.CurrentIndex]);
-            return false;
-        }
-
          while(!P.check(FEOF)&&(P.check(LBRACK)||P.check(LPAREN))){
             if(P.check(LPAREN)) {
                 if(!ParseCall(P,ResultantNode)){
                     return false;
                 }
-                Expr = KExpr_Call;
             }else if(P.check(LBRACK)) {
                 if(!ParseArrayIndexExpr(P,ResultantNode)){
                     return false;
                 }
-                Expr = KExpr_ArrayAccess;
             }
         }
         
@@ -607,89 +583,54 @@ bool Parser::ParseExpr5(ParserHelper &P, Ast *&ResultantNode, KindExpression &Ex
     return true;
 }
 
-bool Parser::ParseExpression(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) {
-    switch (P.CurrentToken)
-    {
-    case IDEN:
-        switch (P.checkh(P.CurrentToken))
-        {
-        case DOTDOT:
-        {
-            tokt tok = P.toks[P.CurrentIndex];
-            Token_type op = P.CurrentToken;
-            ResultantNode = Expression::Create(ResultantNode, op, nullptr, NodeDotDotExpr);
-            P.next();
-            Expr = KExpr_DotDot;
+
+bool Parser::ParseExpr6(ParserHelper &P, Ast *&ResultantNode) {
+    if(!ParseExpression(P,ResultantNode)){
+        return false;
+    }
+
+    Tok Op = P.peek_t();
+    while(P.checkn(COLCOL)) {
+        Ast* Lhs = ResultantNode;
+
+        if(!ParseExpression(P,ResultantNode)){
+            return false;
         }
-        break;
-        case LT:
-        case LBRACE:
+        
+        ResultantNode = Expression::Create(Lhs, Op, ResultantNode, NodePath);
+    }
+
+    return true;
+}
+
+
+bool Parser::ParseExpression(ParserHelper &P, Ast *&ResultantNode) {
+    Lexeme L = P.peek_l();
+    if(P.check(IDEN)||P.check(SELF)){
+        if(!ParseIdentifier(P,ResultantNode)){
+            return false;
+        }
+        if(P.checkh(DOTDOT)) {
+            ///@todo
+        }else if(P.checkh(LT)||P.checkh(LBRACE)) {
             if(!ParseStructExpr(P,ResultantNode)) {
                 return false;
             }
-            Expr = KExpr_StructInit;
-            break;
-        default:
-            if(!ParseIdentifier(P,ResultantNode)){
-                return false;
-            }
-            Expr = KExpr_Identifier;
-            break;
         }
-        break;
-    case LBRACK:
+    }else if(P.check(LBRACK)) {
         if(!ParseListExpr(P,ResultantNode)) {
-                return false;
-        }
-        Expr = KExpr_ArrayInit;
-        break;
-    case LPAREN:
-    {
-        if(!ParseParenExpr(P,ResultantNode, Expr)) {
             return false;
         }
-        Expr = KExpr_Grouped;
-    }   
-    break;
-    case INT:
-    {
-        ResultantNode = NumericLiteral::Create(P.toks[P.CurrentIndex]);
-        P.next();
-        Expr = KExpr_Literal;
+    }else if(P.check(LPAREN)) {
+        if(!ParseParenExpr(P,ResultantNode)) {
+            return false;
+        }
+    }else if(P.peek_t().isLiteral()){
+        if(!ParseLiteral(P,ResultantNode)){
+            return false;
+        }
     }
-    break;
-    case FLOAT:
-    {
-        ResultantNode = FloatLiteral::Create(P.toks[P.CurrentIndex]);
-        P.next();
-        Expr = KExpr_Literal;
-    }
-    break;
-    case STR:
-    {    
-        ResultantNode = StringLiteral::Create(P.toks[P.CurrentIndex],false);
-        P.next();
-        Expr = KExpr_Literal;
-    }
-        break;
-    case CHAR:
-    {
-        ResultantNode = StringLiteral::Create(P.toks[P.CurrentIndex],true);
-        P.next();
-        Expr = KExpr_Literal;
-    }
-    break;
-    case TRUE:
-    case FALSE:
-    {
-        ResultantNode = BoolLiteral::Create(P.toks[P.CurrentIndex]);
-        P.next();
-        Expr = KExpr_Literal;
-    }
-    break;
-    default:
-        break;
-    }
+
     return true;
 }
 
@@ -697,8 +638,8 @@ bool Parser::ParseExpression(ParserHelper &P, Ast *&ResultantNode, KindExpressio
 
 
 bool Parser::ParseLiteral(ParserHelper &P, Ast *&ResultantNode) {
-    tokt t = P.getTok();
-    switch (P.CurrentToken)
+    Lexeme t = P.peek_l();
+    switch (P.peek_tt())
     {
     case INT:
     {
@@ -729,12 +670,12 @@ bool Parser::ParseLiteral(ParserHelper &P, Ast *&ResultantNode) {
     return true;
 }
 
-bool Parser::ParseParenExpr(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) {
+bool Parser::ParseParenExpr(ParserHelper &P, Ast *&ResultantNode) {
     P.next();
     P.dump(__func__);
     Ast* node;
     if(P.check(RPAREN)){
-        err::out("expected expression found -> ",P.toks[P.CurrentIndex]);
+        err::out("expected expression found -> ",P.peek_l());
         return false;
     }
     if(!ParseExpr(P, ResultantNode)){
@@ -743,7 +684,7 @@ bool Parser::ParseParenExpr(ParserHelper &P, Ast *&ResultantNode, KindExpression
     node = ResultantNode;
 
     if(!P.checkn(RPAREN)){
-        err::out("expected ')' found -> ",P.toks[P.CurrentIndex]);
+        err::out("expected ')' found -> ",P.peek_l());
         return false;
     } 
     ResultantNode = GroupedExpr::Create(ResultantNode);
@@ -754,7 +695,7 @@ bool Parser::ParseParenExpr(ParserHelper &P, Ast *&ResultantNode, KindExpression
 
 bool Parser::ParseIdentifier(ParserHelper &P, Ast *&ResultantNode){
     bool HasSelf = false;
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     if(P.check(SELF)){
         HasSelf = true;
     }
@@ -765,13 +706,13 @@ bool Parser::ParseIdentifier(ParserHelper &P, Ast *&ResultantNode){
 
 
 
-bool Parser::ParseDotArrowExpr(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr) {
+bool Parser::ParseDotArrowExpr(ParserHelper &P, Ast *&ResultantNode) {
     while(P.check(DOT)||P.check(ARROW)){
-        tokt tok = P.toks[P.CurrentIndex];
-        Token_type op = P.CurrentToken;
+        Lexeme tok = P.peek_l();
+        Tok op = P.peek_t();
         Ast* LHS = ResultantNode;
         P.next();
-        if(!ParseExpr3(P,ResultantNode,Expr)){
+        if(!ParseExpr3(P,ResultantNode)){
             return false;
         }
         ResultantNode = Expression::Create(LHS, op, ResultantNode, NodeMemExpr);
@@ -783,29 +724,29 @@ bool Parser::ParseDotArrowExpr(ParserHelper &P, Ast *&ResultantNode, KindExpress
 bool Parser::ParseStructExpr(ParserHelper &P, Ast *&ResultantNode) {
     P.dump(__func__);      
     bool isDecl = false;
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     Ast* sig = ResultantNode;
-    std::vector<tokt> Temp;
+    std::vector<Lexeme> Temp;
     std::vector<Ast*> Vals;
 
     if(P.checkn(LT)){
         // if(!isAllowTemp){
-        //     err::out("template with extern not allowed ->",P.toks[P.CurrentIndex]);
+        //     err::out("template with extern not allowed ->",P.peek_l());
         //     return false;
         // }
         while(P.check(IDEN)){
-            Temp.push_back(P.toks[P.CurrentIndex]);
+            Temp.push_back(P.peek_l());
             if(!P.checkn(COMMA))
                 break;
         }
         if(!P.checkn(GT)){
-            err::out("expected '>' found ->",P.toks[P.CurrentIndex]);
+            err::out("expected '>' found ->",P.peek_l());
             return false;
         }
     }
 
     if(!P.checkn(LBRACE)){
-        err::out("expected '{' found -> ",P.toks[P.CurrentIndex]);
+        err::out("expected '{' found -> ",P.peek_l());
         return false;
     }
 
@@ -826,7 +767,7 @@ bool Parser::ParseStructExpr(ParserHelper &P, Ast *&ResultantNode) {
     }
 
     if(!P.checkn(RBRACE)) {
-        err::out("expected '}' found -> ",P.toks[P.CurrentIndex]);
+        err::out("expected '}' found -> ",P.peek_l());
         return false;
     }
     ResultantNode = PostfixExpr::Create(tok,sig,Temp,Vals,NodeStructDef);
@@ -835,7 +776,7 @@ bool Parser::ParseStructExpr(ParserHelper &P, Ast *&ResultantNode) {
 }
 
 bool Parser::ParseArrayIndexExpr(ParserHelper &P, Ast *&ResultantNode) {
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     Ast* Ident = ResultantNode;
     std::vector<Ast*>IndexVal;
     while(!P.check(FEOF)&&!P.check(RBRACK)){
@@ -849,7 +790,7 @@ bool Parser::ParseArrayIndexExpr(ParserHelper &P, Ast *&ResultantNode) {
     }
 
     if(!P.checkn(RBRACK)){
-        err::out("expected ']' found -> ",P.toks[P.CurrentIndex]);
+        err::out("expected ']' found -> ",P.peek_l());
         return false;
     }
 
@@ -860,8 +801,7 @@ bool Parser::ParseArrayIndexExpr(ParserHelper &P, Ast *&ResultantNode) {
 
 bool Parser::ParseBinaryExpr(ParserHelper &P, Ast *&ResultantNode, int prev_prece) {
     P.dump(__func__);
-    tokt tok = P.toks[P.CurrentIndex];
-    Token_type opr;
+    Lexeme tok = P.peek_l();
     Ast* left;
     if(!ResultantNode){
         if(!ParseExpr1(P,ResultantNode,prev_prece)){
@@ -872,9 +812,9 @@ bool Parser::ParseBinaryExpr(ParserHelper &P, Ast *&ResultantNode, int prev_prec
     left = ResultantNode;
 
     //2+3*3/4+2*3
-    while(P.BinaryOP(P.CurrentToken)) {
-        opr = P.CurrentToken;
-        int CurPrecedance = P.preced(opr);
+    Tok opr = P.peek_t();
+    while(opr.IsBinaryOP()||opr.IsAssignOP()) {
+        int CurPrecedance = P.preced(opr.getTokType());
         if(prev_prece > CurPrecedance) {
             ResultantNode = left;
             return true;
@@ -894,59 +834,59 @@ bool Parser::ParseBinaryExpr(ParserHelper &P, Ast *&ResultantNode, int prev_prec
 
 
 bool Parser::ParseSpecificType(ParserHelper &P, Ast *&ResultantNode) {
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     ParseIdentifier(P,ResultantNode);
     Ast* Name = ResultantNode;
     if(P.checkn(LT)){
-        std::vector<tokt>Temp;
+        std::vector<Lexeme>Temp;
         while(P.check(IDEN)){
-            Temp.push_back(P.toks[P.CurrentIndex]);
+            Temp.push_back(P.peek_l());
             if(!P.checkn(COMMA))
                 break;
         }
         if(!P.checkn(GT)){
-            err::out("expected '>' found -",P.toks[P.CurrentIndex]);
+            err::out("expected '>' found -",P.peek_l());
             return false;
         }
-        ResultantNode = PostfixExpr::Create(Name, Temp);
+        ResultantNode = PostfixExpr::Create(Name, Temp, {});
     }
     return true;
 }
 
 bool Parser::ParseEnumStmt(ParserHelper &P, Ast *&ResultantNode) {
-    std::vector<tokt>udata;
+    std::vector<Lexeme>udata;
     std::vector<Ast*>val;
     if(!P.checkn(ENUM)){
-        err::out("expected 'enum' keyword found -",P.toks[P.CurrentIndex]);
+        err::out("expected 'enum' keyword found -",P.peek_l());
         return false;
     }
     if(!P.check(IDEN)) {
-        err::out("expected 'identifier' found -",P.toks[P.CurrentIndex]);
+        err::out("expected 'identifier' found -",P.peek_l());
         return false;
     }
-    tokt Name = P.toks[P.CurrentIndex];
+    Lexeme Name = P.peek_l();
 
     if(!P.checkn(LBRACE)){
-        err::out("expected '{' found ->",P.toks[P.CurrentIndex]);
+        err::out("expected '{' found ->",P.peek_l());
         return false;
     }
 
     while(P.check(IDEN)){
-        udata.push_back(P.toks[P.CurrentIndex]);
-        if(P.checkn(ASSN)){
+        udata.push_back(P.peek_l());
+        if(P.checkn(ASN)){
             if(!ParseExpr(P, ResultantNode)){
                 return false;
             }
             val.push_back(ResultantNode);
         }
         if(!P.checkn(COMMA)){
-            err::out("expected ',' found ->",P.toks[P.CurrentIndex]);
+            err::out("expected ',' found ->",P.peek_l());
             return false;
         }
     }
 
     if(!P.checkn(RBRACE)){
-        err::out("expected '}' found ->",P.toks[P.CurrentIndex]);
+        err::out("expected '}' found ->",P.peek_l());
         return false;
     }
     ResultantNode = EnumExpr::Create(Name, udata, val);
@@ -956,46 +896,46 @@ bool Parser::ParseEnumStmt(ParserHelper &P, Ast *&ResultantNode) {
 
 bool Parser::ParseStructStmt(ParserHelper &P, Ast *&ResultantNode) {
     P.dump(__func__);
-    tokt tok = P.toks[P.CurrentIndex];
-    std::vector<tokt> ElementName;
+    Lexeme tok = P.peek_l();
+    std::vector<Lexeme> ElementName;
     std::vector<Ast*> ElementTy;
-    std::vector<tokt> Temp;
+    std::vector<Lexeme> Temp;
     if(!P.checkn(STRUCT)) {
-        err::out("expected keyword 'struct' found ->",P.toks[P.CurrentIndex]);
+        err::out("expected keyword 'struct' found ->",P.peek_l());
         return false;
     }
 
     if(!P.check(IDEN)) {
-        err::out("expected 'identifier' found ->",P.toks[P.CurrentIndex]);
+        err::out("expected 'identifier' found ->",P.peek_l());
         return false;
     }
-    tokt Name = P.toks[P.CurrentIndex];
+    Lexeme Name = P.peek_l();
   
     if(P.checkn(LT)){
         while(P.check(IDEN)){
-            Temp.push_back(P.toks[P.CurrentIndex]);
+            Temp.push_back(P.peek_l());
             if(!P.checkn(COMMA))
                 break;
         }
         if(!P.checkn(GT)){
-            err::out("expected '>' found ->",P.toks[P.CurrentIndex]);
+            err::out("expected '>' found ->",P.peek_l());
             return false;
         }
     }
 
     if(!P.check(LBRACE)){
-        err::out("expected field expression '{' found -> ",P.toks[P.CurrentIndex]);
+        err::out("expected field expression '{' found -> ",P.peek_l());
         return false;
     }
 
-    while(P.CurrentToken !=  FEOF && P.check(IDEN)){
-        ElementName.push_back(P.toks[P.CurrentIndex]);
+    while(P.peek_tt() !=  FEOF && P.check(IDEN)){
+        ElementName.push_back(P.peek_l());
         if(P.checkn(COL)){
-            err::out("expected struct field expression ':' found - ",P.toks[P.CurrentIndex]);
+            err::out("expected struct field expression ':' found - ",P.peek_l());
             return false;
         }
         if(!ParseType(P,ResultantNode)){
-            err::out("expected struct field expression ': ?type' found - ",P.toks[P.CurrentIndex]);
+            err::out("expected struct field expression ': ?type' found - ",P.peek_l());
             return false;
         }
         ElementTy.push_back(ResultantNode);
@@ -1005,7 +945,7 @@ bool Parser::ParseStructStmt(ParserHelper &P, Ast *&ResultantNode) {
     }
 
     if(!P.checkn(RBRACE)){
-        err::out("expected '}' found -> ",P.toks[P.CurrentIndex]);
+        err::out("expected '}' found -> ",P.peek_l());
         return false;
     }
 
@@ -1020,31 +960,31 @@ bool Parser::ParseStructStmt(ParserHelper &P, Ast *&ResultantNode) {
 
 bool Parser::ParseFuncDef(ParserHelper &P, Ast *&ResultantNode) {
      P.dump(__func__);
-    tokt tok = P.toks[P.CurrentIndex];
-    std::vector<tokt>pN;
+    Lexeme tok = P.peek_l();
+    std::vector<Lexeme>pN;
     std::vector<Ast*>pTy;
     Ast* RetVal = nullptr;
     Ast* StructVal = nullptr;
     Ast* Block = nullptr;
 
     if(!P.checkn(FN)) {
-        err::out("expected keyword 'fn' found ->\'",P.toks[P.CurrentIndex]);
+        err::out("expected keyword 'fn' found ->\'",P.peek_l());
         return false;
     }
     if(!P.check(IDEN)){
-        err::out("expected 'Identifier' with function defination found ->\'",P.toks[P.CurrentIndex]);
+        err::out("expected 'Identifier' with function defination found ->\'",P.peek_l());
         return false;
     }   
-    tokt Name = P.toks[P.CurrentIndex];
+    Lexeme Name = P.peek_l();
 
     if(P.checkn(LPAREN)) {
-        err::out("expected function expression (parameters : type) found -> ",P.toks[P.CurrentIndex]);
+        err::out("expected function expression (parameters : type) found -> ",P.peek_l());
         return false;
     }
     while(P.check(IDEN)) {
-        pN.push_back(P.toks[P.CurrentIndex]);
+        pN.push_back(P.peek_l());
         if(!P.checkn(SCOL)){
-            err::out("expected ':' found -> \'",P.toks[P.CurrentIndex]);
+            err::out("expected ':' found -> \'",P.peek_l());
             return false;
         }
         if(!ParseType(P,ResultantNode)) {
@@ -1058,13 +998,13 @@ bool Parser::ParseFuncDef(ParserHelper &P, Ast *&ResultantNode) {
     }
 
     if(!P.checkn(RPAREN)){
-        err::out("expected ')' found -> ",P.toks[P.CurrentIndex]);
+        err::out("expected ')' found -> ",P.peek_l());
         return false;
     }
 
     if(P.checkn(ARROW)){
         if(!ParseType(P,ResultantNode)){
-            err::out("expected 'type' found -> ",P.toks[P.CurrentIndex]);
+            err::out("expected 'type' found -> ",P.peek_l());
             return false;
         }
         RetVal = ResultantNode;
@@ -1072,13 +1012,12 @@ bool Parser::ParseFuncDef(ParserHelper &P, Ast *&ResultantNode) {
 
 
     if(P.check(LBRACE)) {
-        bool isBrace = true;
-        if(!ParseBlock(P, ResultantNode,isBrace)){
+        if(!ParseBlock(P, ResultantNode,false)){
             return false;
         }
         Block = ResultantNode;
     }else{
-        err::out("expected function body expression '{}' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected function body expression '{}' found - ",P.peek_l());
         return false;
     }
     ResultantNode = FunctionDef::Create(tok,Name, pN, pTy, RetVal, Block);
@@ -1088,9 +1027,9 @@ bool Parser::ParseFuncDef(ParserHelper &P, Ast *&ResultantNode) {
 
 bool Parser::ParseIfStmt(ParserHelper &P, Ast *&ResultantNode) {
     P.dump(__func__);
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     if(!P.checkn(IF)){
-        err::out("expected 'if' found - ",P.toks[P.CurrentIndex]);   
+        err::out("expected 'if' found - ",P.peek_l());   
         return false;
     }
     Ast* condition = nullptr;
@@ -1098,7 +1037,7 @@ bool Parser::ParseIfStmt(ParserHelper &P, Ast *&ResultantNode) {
     Ast* else_ = nullptr;
 
     if(P.check(LBRACE)) {
-        err::out("expected 'condition' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected 'condition' found - ",P.peek_l());
         return false;
     }
 
@@ -1112,14 +1051,14 @@ bool Parser::ParseIfStmt(ParserHelper &P, Ast *&ResultantNode) {
     //     //todo
     // }
 
-    bool isBrace = true;
-    if(!ParseBlock(P, ResultantNode,isBrace)){
+
+    if(!ParseBlock(P, ResultantNode,false)){
         return false;
     }
     if_ = ResultantNode;
 
     if(P.checkn(ELSE)) {
-        switch(P.CurrentToken){
+        switch(P.peek_tt()){
             case IF:
                 if(!ParseIfStmt(P,ResultantNode)){
                     return false;
@@ -1127,13 +1066,13 @@ bool Parser::ParseIfStmt(ParserHelper &P, Ast *&ResultantNode) {
                 else_ = ResultantNode;
                 break;
             case LBRACE:
-                if(!ParseBlock(P, ResultantNode, isBrace)){
+                if(!ParseBlock(P, ResultantNode, false)){
                     return false;
                 }
                 else_ = ResultantNode;
                 break;
             default:
-                err::out("invalid else expression ",P.toks[P.CurrentIndex]);
+                err::out("invalid else expression ",P.peek_l());
                 return false;
 
         }
@@ -1145,13 +1084,13 @@ bool Parser::ParseIfStmt(ParserHelper &P, Ast *&ResultantNode) {
 }
 
 bool Parser::ParseForStmt(ParserHelper &P, Ast *&ResultantNode){
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     Ast* var = nullptr;
     Ast* cond = nullptr;
     Ast* incr = nullptr;
     Ast* body = nullptr;
     if(!P.checkn(FOR)) {
-        err::out("expected keyword 'for' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected keyword 'for' found - ",P.peek_l());
         return false;
     }
 
@@ -1159,7 +1098,7 @@ bool Parser::ParseForStmt(ParserHelper &P, Ast *&ResultantNode){
         goto cond;
     }
     if(!P.check(LET)){
-        err::out("expected for expression 'identifier' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected for expression 'identifier' found - ",P.peek_l());
         return false;
     }
     if(!ParseVarStmt(P, ResultantNode)){
@@ -1167,7 +1106,7 @@ bool Parser::ParseForStmt(ParserHelper &P, Ast *&ResultantNode){
     }
     var = ResultantNode;
     if(!P.checkn(SCOL)){
-        err::out("expected for expression ';' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected for expression ';' found - ",P.peek_l());
         return false;
     }
 cond:
@@ -1179,7 +1118,7 @@ cond:
     }
     cond = ResultantNode;
     if(!P.checkn(SCOL)){
-        err::out("expected for expression ';' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected for expression ';' found - ",P.peek_l());
         return false;
     }
 
@@ -1192,8 +1131,7 @@ incr:
     }
     incr = ResultantNode;
 body:
-    bool isBrace = true;
-    if(!ParseBlock(P,ResultantNode,isBrace)){
+    if(!ParseBlock(P,ResultantNode,false)){
         return false;
     }
     body = ResultantNode;
@@ -1205,86 +1143,85 @@ body:
 // ref from rust lang and scribe
 bool Parser::ParseForInStmt(ParserHelper &P, Ast *&ResultantNode) {
     P.dump(__func__);
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     Ast* in = nullptr;
     Ast* var = nullptr;
     Ast* cond = nullptr;
     Ast* incr = nullptr;
     Ast* body = nullptr;
-    bool isBrace = true;
+    // bool isBrace = true;
     if(!P.checkn(FOR)) {
-        err::out("expected keyword 'for' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected keyword 'for' found - ",P.peek_l());
         return false;
     }
 
     if(!P.check(IDEN)){
-        err::out("expected 'identifier' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected 'identifier' found - ",P.peek_l());
         return false;
     }
     ParseIdentifier(P,ResultantNode);
     Ast* tempvar = ResultantNode;
-    tokt iter_tempvar__tok = P.getTok();
+    Lexeme iter_tempvar__tok = P.peek_l();
 
 
     if(!P.checkn(IN)){
-        err::out("expected keyword 'in' found -> ",P.toks[P.CurrentIndex]);
+        err::out("expected keyword 'in' found -> ",P.peek_l());
         return false;
     }
     // 0..1 , iter
 
     if(P.check(LBRACE)){
-        err::out("expected 'expression' found -> ",P.toks[P.CurrentIndex]);
+        err::out("expected 'expression' found -> ",P.peek_l());
         return false;
     }
     if(P.check(INT)){
         Ast *from;
         Ast *to;
         Ast *intlit;
-
-        from = NumericLiteral::Create(P.toks[P.CurrentIndex]);
+        from = NumericLiteral::Create(P.peek_l());
         P.next();
         if(!P.checkn(DOTDOT)){
-            err::out("expected for-in expression '..' found - ",P.toks[P.CurrentIndex]);
+            err::out("expected for-in expression '..' found - ",P.peek_l());
             return false;
         }
 
         if(!P.check(INT)){
-            err::out("expected for-in expression integer after '..' found - ",P.toks[P.CurrentIndex]);
+            err::out("expected for-in expression integer after '..' found - ",P.peek_l());
             return false;
         }
-
-        to = NumericLiteral::Create(P.toks[P.CurrentIndex]);;
+        to = NumericLiteral::Create(P.peek_l());;
         P.next();
 
         if(P.checkn(DOTDOT)){
             if(!P.check(INT)){
-                err::out("expected for-in expression integer after '..' found - ",P.toks[P.CurrentIndex]);
+                err::out("expected for-in expression integer after '..' found - ",P.peek_l());
                 return false;
             }
-            intlit = NumericLiteral::Create(P.toks[P.CurrentIndex]);;
+
+            intlit = NumericLiteral::Create(P.peek_l());;
             P.next();
         }else{
-            tokt t = tokt(-1,-1,"1",INT);
+            Lexeme t = Lexeme("1",INT);
             intlit = NumericLiteral::Create(t);
         }
         
-        if(!ParseBlock(P,ResultantNode,isBrace)){
+        if(!ParseBlock(P,ResultantNode,false)){
             return false;
         }
         body = ResultantNode;
         var = VarStmt::Create(iter_tempvar__tok,tempvar, nullptr, from,false);
         cond = Expression::Create(tempvar, LT, to,NodeBinaryExpr);
-        incr = Expression::Create(tempvar, ASSN_PLUS, intlit,NodeBinaryExpr);
+        incr = Expression::Create(tempvar, ASN_PLUS, intlit,NodeBinaryExpr);
         ResultantNode = ForLoop::Create(tok, var, cond, incr, body);
         return true; 
 
     }else{    
         if(!ParseExpr(P,ResultantNode)) {
-            err::out("for-in use only { 1..5..1 , .iter()} -> ",P.getTok());
+            err::out("for-in use only { 1..5..1 , .iter()} -> ",P.peek_t());
             return false;
         }
         if(ResultantNode->nodeCategory() != NodeMemExpr){
-            err::out("expected 'iterator' expression found -> ",P.getTok());
+            err::out("expected 'iterator' expression found -> ",P.peek_t());
             return false;
         }
         in = ResultantNode;
@@ -1296,12 +1233,12 @@ bool Parser::ParseForInStmt(ParserHelper &P, Ast *&ResultantNode) {
         body = ResultantNode;
         
         ///<iterVar> = <vector.iter()>
-        tokt iter_var_tok = tokt(-1, -1, "iterVar", IDEN);
-        tokt iter__tempvar__tok = tokt(-1, -1, "_"+tempvar->toString(), IDEN);
-        tokt iter_begin_tok = tokt(-1, -1, "begin", IDEN);
-        tokt iter_end_tok = tokt(-1, -1, "end", IDEN);
-        tokt iter_next_tok = tokt(-1, -1, "next", IDEN);
-        tokt iter_at_tok = tokt(-1, -1, "at", IDEN);
+        Lexeme iter_var_tok = Lexeme("iterVar", IDEN);
+        Lexeme iter__tempvar__tok = Lexeme("_"+tempvar->toString(), IDEN);
+        Lexeme iter_begin_tok = Lexeme("begin", IDEN);
+        Lexeme iter_end_tok = Lexeme("end", IDEN);
+        Lexeme iter_next_tok = Lexeme("next", IDEN);
+        Lexeme iter_at_tok = Lexeme("at", IDEN);
 
         Ast* iter_begin_Iden = Identifier::Create(iter_begin_tok);
         Ast* iter_end_Iden = Identifier::Create(iter_end_tok);
@@ -1327,7 +1264,7 @@ bool Parser::ParseForInStmt(ParserHelper &P, Ast *&ResultantNode) {
         args = {iter_tempvar_ident};
         Ast* nextcall = FunctionCall::Create(iter_next_tok, iter_next_Iden, args);
         Ast* iternext = Expression::Create( iter_var_ident, DOT, nextcall, NodeMemExpr);
-        incr = Expression::Create(iter_tempvar_ident, ASSN, iternext, NodeAssnExpr);
+        incr = Expression::Create(iter_tempvar_ident, ASN, iternext, NodeAssnExpr);
 
         ///<var = _iterVar.at()>
         args.clear();
@@ -1350,15 +1287,15 @@ bool Parser::ParseForInStmt(ParserHelper &P, Ast *&ResultantNode) {
 
 
 bool Parser::ParseExtern(ParserHelper &P, Ast *&ResultantNode) {
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     P.next();
     std::vector<Ast*>Header;
     if(!P.checkn(LBRACK)){
-        err::out("expected '[' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected '[' found - ",P.peek_l());
         return false;
     }
     if(!P.check(IDEN)) {
-        err::out("expected 'identifier' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected 'identifier' found - ",P.peek_l());
         return false;
     }
     if(!ParseIdentifier(P,ResultantNode)){
@@ -1366,7 +1303,7 @@ bool Parser::ParseExtern(ParserHelper &P, Ast *&ResultantNode) {
     }
     Header.push_back(ResultantNode);
     if(!P.check(STR)) {
-        err::out("expected 'string' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected 'string' found - ",P.peek_l());
         return false;
     }
     if(!ParseLiteral(P,ResultantNode)){
@@ -1374,7 +1311,7 @@ bool Parser::ParseExtern(ParserHelper &P, Ast *&ResultantNode) {
     }
     Header.push_back(ResultantNode);
     if(!P.checkn(RBRACK)){
-        err::out("expected ']' found - ",P.toks[P.CurrentIndex]);
+        err::out("expected ']' found - ",P.peek_l());
         return false;
     }
 
@@ -1391,7 +1328,7 @@ bool Parser::ParseExtern(ParserHelper &P, Ast *&ResultantNode) {
             return false;
         }
     }else{
-        err::out("expected fn and struct statement block with extern found - ",P.toks[P.CurrentIndex]);
+        err::out("expected fn and struct statement block with extern found - ",P.peek_l());
         return false;
     }
     Header.push_back(ResultantNode);
@@ -1402,26 +1339,28 @@ bool Parser::ParseExtern(ParserHelper &P, Ast *&ResultantNode) {
 
 
 bool Parser::ParseVarStmt(ParserHelper &P, Ast *&ResultantNode) {
-    tokt tok = P.toks[P.CurrentIndex];
+    Lexeme tok = P.peek_l();
     Ast* Var;
     Ast* Ty;
     Ast* Val;
     bool isty = false;
     bool isval = false;
-    bool isuse = false;
-    bool isIs = false;
-    bool isIn = false;
     bool isConst = false;
-    if(!P.checkn(LET)){
-        err::out("expected 'let' found -> ",P.toks[P.CurrentIndex]);
-        return false;
-    }
-    if(P.checkn(CONST)){
+    bool isLet = false;
+    bool isStatic = false;
+    if(P.checkn(LET)){
+        isLet = true;
+    }else if(P.checkn(STATIC)){
         isConst = true;
+    }else if(P.checkn(CONST)){
+        isConst = true;
+    }else{
+        err::out("expected {const, let, static} found - ",P.peek_l());
+        return false;
     }
 
     if(!P.check(IDEN)){
-        err::out("expected 'identifier' found -> ",P.toks[P.CurrentIndex]);
+        err::out("expected 'identifier' found - ",P.peek_l());
         return false;
     }
     ParseIdentifier(P,ResultantNode);
@@ -1438,7 +1377,7 @@ bool Parser::ParseVarStmt(ParserHelper &P, Ast *&ResultantNode) {
     Ty = ResultantNode;
 
 val:  
-    if(!P.checkn(ASSN)){
+    if(!P.checkn(ASN)){
         goto done;
     }
     isval = true;
@@ -1448,14 +1387,43 @@ val:
     Val = ResultantNode;
 done:
     if(!isval && !isty){
-        err::out("invalid variable declaration - no type or value set", P.getTok());
+        err::out("invalid variable declaration - no type or value set", P.peek_t());
         return false;
     }
     
     if(isConst) {
         if(!isval||!isty) {
-            err::out("let-const statements should have type and val "
-					" - no 'in' and 'is' allowed", P.getTok());
+            err::out("missing type for `const` item - ", P.peek_t());
+            err::out("free constant item without body - ", P.peek_t());
+    
+            return false;
+        }
+        if(!isval) {
+            err::out("free constant item without body - ", P.peek_t());
+    
+            return false;
+        }
+        if(!isty) {
+            err::out("missing type for `const` item - ", P.peek_t());
+    
+            return false;
+        }
+    }
+    
+    if(isStatic) {
+        if(!isval||!isty) {
+            err::out("missing type for `static` item - ", P.peek_t());
+            err::out("free constant item without body - ", P.peek_t());
+
+            return false;
+        }
+        if(!isty) {
+            err::out("missing type for `static` item - ", P.peek_t());
+    
+            return false;
+        }
+        if(!isval) {
+            err::out("free static item without body - ", P.peek_t());
     
             return false;
         }

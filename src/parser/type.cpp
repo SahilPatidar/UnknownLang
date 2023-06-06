@@ -24,7 +24,8 @@ Type* StructType::getTypeAt(std::string n) const {
     }
     return nullptr;
 }
-Type* StructType::getType(std::string n) {
+
+Type* StructType::getType(std::string n) const {
     if(EleNameTypeList.find(n) == EleNameTypeList.end()) {
         return nullptr;
     }

@@ -4,8 +4,8 @@
 
 namespace analyzer{
 
-bool TypeChecker::visit(PreDefineType *AstNode) {
-    switch (AstNode->getType())
+bool TypeChecker::visit(PreDefineType  *AstNode) {
+    switch (AstNode->getType().getTokType())
     {
     case I8:
         ResType = TypeGenerator::GenerateIntType(8,true);
@@ -50,7 +50,7 @@ bool TypeChecker::visit(PreDefineType *AstNode) {
     return true;
 }
 
-bool TypeChecker::visit(FnType *AstNode) {
+bool TypeChecker::visit(FnType  *AstNode) {
     std::vector<Type*>pTy;
     if(!AstNode->getParamType().empty()) {
         for(int i = 0, size = AstNode->getParamType().size(); i < size; i++) {
@@ -75,11 +75,11 @@ bool TypeChecker::visit(FnType *AstNode) {
 }
 
 
-bool TypeChecker::visit(StructStmt *AstNode) {
-    std::vector<tokt>Temp;
+bool TypeChecker::visit(StructStmt  *AstNode) {
+    std::vector<Lexeme>Temp;
     std::vector<std::string>ElementNameList;
     std::vector<Type*>ElementTypeList;
-    if(Regmgr->contains(AstNode->getName().data)) {
+    if(Regmgr->contains(AstNode->getName().getStr())) {
         //todo
     }
     if(AstNode->HasTemplate()){
@@ -94,7 +94,7 @@ bool TypeChecker::visit(StructStmt *AstNode) {
         if(!ResType){
             //todo
         }
-        std::string EleName = AstNode->getIdentList()[i].data;
+        std::string EleName = AstNode->getIdentList()[i].getStr();
         if(std::find(ElementNameList.begin(), ElementNameList.end(), EleName) == ElementNameList.end()){
             //todo
         }
@@ -102,18 +102,18 @@ bool TypeChecker::visit(StructStmt *AstNode) {
         ElementTypeList.push_back(ResType);
     }
     ResType = TypeGenerator::GenerateStructType(ElementNameList, ElementTypeList, Temp);
-    Regmgr->addInfo(AstNode->getName().data, ResType, nullptr, AstNode);
+    Regmgr->addInfo(AstNode->getName().getStr(), ResType, nullptr, AstNode);
     return true;
 }
 
-bool TypeChecker::visit(EnumExpr *AstNode) {
+bool TypeChecker::visit(EnumExpr  *AstNode) {
     std::vector<std::string>uData;
     std::vector<Type*>Val;
-    if(Regmgr->contains(AstNode->getName().data)) {
+    if(Regmgr->contains(AstNode->getName().getStr())) {
         //todo
     }
     for(int i = 0, size = AstNode->getuData().size(); i < size; i++) {
-        uData.push_back(AstNode->getuData()[i].data);
+        uData.push_back(AstNode->getuData()[i].getStr());
         if(AstNode->getValue()[i]) {
             AstNode->getValue()[i]->accept(*this);
             if(!ResType) {
@@ -128,9 +128,10 @@ bool TypeChecker::visit(EnumExpr *AstNode) {
         }
     }
     ResType = TypeGenerator::GenerateEnumType(uData,Val);
-    Regmgr->addInfo(AstNode->getName().data, ResType, nullptr, AstNode);
+    Regmgr->addInfo(AstNode->getName().getStr(), ResType, nullptr, AstNode);
     return true;
 }
+
 
 bool TypeChecker::CheckImplicitTypeCast(Ast *Node, Type *&from, Type *&to) {
     if(from->IsCastRequire(to)){
@@ -143,7 +144,8 @@ bool TypeChecker::CheckImplicitTypeCast(Ast *Node, Type *&from, Type *&to) {
     return true;
 }
 
-bool TypeChecker::visit(ReturnStmt *AstNode) {
+
+bool TypeChecker::visit(ReturnStmt  *AstNode) {
     auto RetType = Regmgr->getFuncBack()->getRetType();
     if(!RetType&&!AstNode->getRetValue()){
         return true;
@@ -162,7 +164,7 @@ bool TypeChecker::visit(ReturnStmt *AstNode) {
 
 
 
-bool TypeChecker::visit(ListExpr *AstNode) {
+bool TypeChecker::visit(ListExpr  *AstNode) {
     if(AstNode->getList().empty()){
         //todo
     }
@@ -185,8 +187,8 @@ bool TypeChecker::visit(ListExpr *AstNode) {
 }
 
 
-bool TypeChecker::visit(FunctionDef *AstNode) {
-    std::string n = AstNode->getFuncName().data;
+bool TypeChecker::visit(FunctionDef  *AstNode) {
+    std::string n = AstNode->getFuncName().getStr();
     FunctionType* fnTy;
     if(Regmgr->contains(n)){
             ///@todo
@@ -207,7 +209,7 @@ bool TypeChecker::visit(FunctionDef *AstNode) {
             if(!ResType){
                 //todo
             }
-            std::string ParamName = AstNode->getParameterNames()[i].data;
+            std::string ParamName = AstNode->getParameterNames()[i].getStr();
             if(std::find(ElementType.begin(),ElementType.end(),ParamName) == ElementType.end()){
                 err::dumperr("redefinition of parameter", AstNode->getParameterNames()[i], AstNode->toString());
                 return false;
@@ -217,7 +219,7 @@ bool TypeChecker::visit(FunctionDef *AstNode) {
         }
     }
     auto func = TypeGenerator::GenerateFuncType(ElementType, RetType);
-    Regmgr->addInfo(AstNode->getFuncName().data, func, nullptr, AstNode);
+    Regmgr->addInfo(AstNode->getFuncName().getStr(), func, nullptr, AstNode);
     Regmgr->Push_Func(func);
     if(!AstNode->getFuncBlock()->accept(*this)){
         ///@todo
@@ -230,7 +232,7 @@ bool TypeChecker::visit(FunctionDef *AstNode) {
 }
 
 
-bool TypeChecker::visit(FunctionCall *AstNode) {
+bool TypeChecker::visit(FunctionCall  *AstNode) {
     if(!AstNode->getCalle()->accept(*this)) {
         ///@todo
     }
@@ -260,7 +262,7 @@ bool TypeChecker::visit(FunctionCall *AstNode) {
     return true;
 }
 
-bool TypeChecker::visit(VarStmt *AstNode) {
+bool TypeChecker::visit(VarStmt  *AstNode) {
     AstNode->getType()->accept(*this);
     Type* type = ResType;
     AstNode->getVal()->accept(*this);
@@ -284,7 +286,7 @@ bool TypeChecker::visit(VarStmt *AstNode) {
 
 
 
-bool TypeChecker::visit( PostfixExpr *AstNode) {
+bool TypeChecker::visit( PostfixExpr  *AstNode) {
     switch (AstNode->nodeCategory())
     {   
     case NodeStructDef:
@@ -351,7 +353,7 @@ bool TypeChecker::visit( PostfixExpr *AstNode) {
     }
 }
 
-bool TypeChecker::visit(Array *AstNode) {
+bool TypeChecker::visit(Array  *AstNode) {
     AstNode->getArrayType()->accept(*this);
 
     if(!ResType){
@@ -376,11 +378,11 @@ bool TypeChecker::visit(Array *AstNode) {
     return true;
 }
 
-bool TypeChecker::visit(PrefixExpr *AstNode) {
+bool TypeChecker::visit(PrefixExpr  *AstNode) {
     // auto Ptr = static_cast<>
     switch (AstNode->nodeCategory())
     {
-    case NodePtr:
+    case NodeDeref:
     {
         if(AstNode->IsType()) {
         AstNode->getBase()->accept(*this);
@@ -423,7 +425,7 @@ bool TypeChecker::visit(PrefixExpr *AstNode) {
     return true;
 }
 
-bool TypeChecker::visit(GroupedExpr *AstNode) {
+bool TypeChecker::visit(GroupedExpr  *AstNode) {
     AstNode->getExpression()->accept(*this);
     if(!ResType) {
         //todo
@@ -433,16 +435,20 @@ bool TypeChecker::visit(GroupedExpr *AstNode) {
 
 
 
-bool TypeChecker::visit(Method *AstNode) {
-    std::string n = AstNode->getName().data;
-    auto AssociateTy = Regmgr->getType(n);
+bool TypeChecker::visit(Method  *AstNode) {
+    // std::string n = AstNode->getName().data; //old
+    if(!AstNode->getName()->accept(*this)){
+        return false;
+    }
+    // auto AssociateTy = Regmgr->getType(n); //old
+    auto AssociateTy = ResType;
     if(AssociateTy->type() != TypeStruct) {
         ///@todo
     }
     std::map<std::string, Type*>impl;
     Regmgr->Push_Stack();
     for(int i = 0, size = AstNode->getImpl().size(); i < size; i++) {
-        auto fn = static_cast<FunctionDef*>(AstNode->getImpl()[i])->getFuncName().data;
+        auto fn = static_cast<FunctionDef*>(AstNode->getImpl()[i])->getFuncName().getStr();
         AstNode->getImpl()[i]->accept(*this);
         if(!ResType) {
             ///@todo
@@ -572,7 +578,7 @@ bool TypeChecker::CheckRHSInField(Ast* &Node, StructType *&StructTy) {
    return true;
 }
 
-bool TypeChecker::visit(Expression *AstNode) {
+bool TypeChecker::visit(Expression  *AstNode) {
     switch (AstNode->nodeCategory())
     {
     case NodeMemExpr:
@@ -662,7 +668,11 @@ bool TypeChecker::visit(Expression *AstNode) {
         AstNode->setType(ResType);
     }
         break;
-
+    case NodePath:
+    {
+        std::string n = AstNode->getLhs()->toString();
+        Mod.
+    }
     default:
         break;
     }
@@ -684,7 +694,7 @@ bool TypeChecker::visit(BlockStmt *AstNode) {
     return true;
 }
 
-bool TypeChecker::visit(ForLoop *AstNode) {
+bool TypeChecker::visit(ForLoop  *AstNode) {
     Regmgr->Push_Stack();
     AstNode->getVar()->accept(*this);
     if(!ResType){
@@ -699,7 +709,7 @@ bool TypeChecker::visit(ForLoop *AstNode) {
     return true;
 }
 
-bool TypeChecker::visit(WhileLoop *AstNode) {
+bool TypeChecker::visit(WhileLoop  *AstNode) {
     AstNode->getCond()->accept(*this);
     if(!ResType || ResType->type() != TypeBoolean){
         ///@todo
@@ -710,7 +720,7 @@ bool TypeChecker::visit(WhileLoop *AstNode) {
     return true;
 }
 
-bool TypeChecker::visit(IfStmt *AstNode) {
+bool TypeChecker::visit(IfStmt  *AstNode) {
     AstNode->getCondV()->accept(*this);
     if(!ResType || ResType->type() != TypeBoolean){
         ///@todo

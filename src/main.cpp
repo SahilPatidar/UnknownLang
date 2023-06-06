@@ -8,36 +8,12 @@
 #include"parser/parser.hpp"
 #include"parser/Ast.hpp"
 #include"lex/lex.hpp"
+#include"../../include/utils/File.hpp"
+#include"../../include/Module.hpp"
 
-
-
+using namespace module;
 void compile(){
-   std::ifstream file("call.fn");
-   std::stringstream buf;
-   buf << file.rdbuf();
-   //std::cout<<buf.str();
-   std::string src = buf.str();
-   lex::tok_t toks;
-   int ipos=0;
-   int str_len = src.size();
-   bool c = lex::tokenizer(src, toks, ipos, str_len);
-   if(!c){
-    printf("invalid src string..\n");
-   }
-   int in = 0;
-   for(int i = 0 ; i < toks.size(); i++){
-      std::cout<<toks[i].data<<" -> "<<toks[i].tok_type<<std::endl;
-   }
-
-   parser::Parser p(toks,in);
-   ast::Ast* tree = p.parse();
-
-   auto t = static_cast<ast::BlockStmt*>(tree);
-   // std::cout<<std::dynamic_pointer_cast<ast::WhileLoop>(t->statements()[0])->loopbody()->toString()<<std::endl;
-   std::cout<<""<<t->getStmts().size()<<std::endl;
-   std::cout<<" ->\n "<<tree->toString()<<std::endl;
-
-
+  
 }
 
 int main(int argc, char *argv[]){
@@ -45,7 +21,9 @@ int main(int argc, char *argv[]){
     //     printf("too few args");
     //     return EXIT_FAILURE;
     // }else{
-        compile();
-
+      std::string path;
+      ModuleInfo::CreateModInfoByAbsPath(path);
+      compile();
+         
    // }
 }

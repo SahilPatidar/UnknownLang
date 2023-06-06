@@ -29,11 +29,11 @@ protected:
     bool HasRefOrAndOp;
 public:
  virtual ~Type() = default;
- virtual Type* OperationFinalOutput(lex::Token_type op, const Type* type) const;
- virtual bool UnaryOpMatch(lex::Token_type op);
+ virtual Type* OperationFinalOutput(lex::Tok op, const Type* type) const;
+ virtual bool UnaryOpMatch(lex::Tok op);
  virtual bool IsCastRequire(Type *tofrom);
  virtual bool IsCastable(Type *tofrom);
- virtual bool IsValidOperation(Token_type op, Type* Ty);
+ virtual bool IsValidOperation(Tok op, Type* Ty);
  virtual KindType type() const = 0;
  inline bool isConst() const { return IsConst; }
  inline void setConst(bool _isConst) { IsConst = _isConst; }
@@ -50,8 +50,8 @@ public:
 
     bool isSignInt() const {return isSign;}
     int getbit() const {return bit;}    
-    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
-    bool UnaryOpMatch(lex::Token_type op);
+    Type* OperationFinalOutput(lex::Tok op, const Type* type);
+    bool UnaryOpMatch(lex::Tok op);
     KindType type() const { return TypeInt; }
 };
 
@@ -64,8 +64,8 @@ public:
     FloatType(uint16_t &_bit)
     :bit(_bit) {}
     int getbit() const {return bit;}
-    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
-    bool UnaryOpMatch(lex::Token_type op);
+    Type* OperationFinalOutput(lex::Tok op, const Type* type);
+    bool UnaryOpMatch(lex::Tok op);
     KindType type() const { return TypeDecimal; }
 
 };
@@ -74,8 +74,8 @@ class BoolType: public Type {
 private:
 
 public:
-    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
-    bool UnaryOpMatch(lex::Token_type op);
+    Type* OperationFinalOutput(lex::Tok op, const Type* type);
+    bool UnaryOpMatch(lex::Tok op);
     KindType type() const { return TypeBoolean; }
 
 };
@@ -89,8 +89,8 @@ public:
 //     :type(_type) {}
 
 //     Type* consType() const {return type;}
-//     Type* OperationFinalOutput(lex::Token_type op, const Type* type);
-//     bool UnaryOpMatch(lex::Token_type op);
+//     Type* OperationFinalOutput(lex::Tok op, const Type* type);
+//     bool UnaryOpMatch(lex::Tok op);
 //     KindType type() const { return TYPE_CONST; }
 
 
@@ -115,8 +115,8 @@ public:
 
     std::vector<Type*>getParamTypes() const { return param; }
     Type* getRetType() const { return retype; }
-    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
-    bool UnaryOpMatch(lex::Token_type op);
+    Type* OperationFinalOutput(lex::Tok op, const Type* type);
+    bool UnaryOpMatch(lex::Tok op);
     KindType type() const { return TypeFunction; }
 
 };
@@ -126,10 +126,10 @@ private:
     std::map<std::string, Type*>EleNameTypeList;
     std::vector<std::string>NameList;
     std::vector<Type*>TypeList;
-    std::vector<tokt>Temp;
+    std::vector<Lexeme>Temp;
     std::map<std::string,Type*>Impl;
 public:
-    StructType(std::map<std::string, Type*>&_EleNameTypeList, std::vector<tokt>&_Temp) 
+    StructType(std::map<std::string, Type*>&_EleNameTypeList, std::vector<Lexeme>&_Temp) 
     :EleNameTypeList(_EleNameTypeList), Temp(_Temp) {}
 
     std::map<std::string, Type*>getNameTypeList() const {return EleNameTypeList;}
@@ -158,10 +158,10 @@ public:
     Type* getImpl(std::string &n) { 
         return Impl.find(n) == Impl.end()? nullptr: Impl[n]; 
     }
-    std::vector<tokt> getTemp() const {return Temp;}
+    std::vector<Lexeme> getTemp() const {return Temp;}
     bool HasTemp() const {return !Temp.empty();}
-    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
-    bool UnaryOpMatch(lex::Token_type op);
+    Type* OperationFinalOutput(lex::Tok op, const Type* type);
+    bool UnaryOpMatch(lex::Tok op);
     KindType type() const { return TypeStruct; }
 };
 
@@ -174,8 +174,8 @@ public:
     Type* getArrType() const { return base; }
     // std::vector<int> getArrSize() const { return size; }
     int getArrSize() const { return Dim; }
-    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
-    bool UnaryOpMatch(lex::Token_type op);
+    Type* OperationFinalOutput(lex::Tok op, const Type* type);
+    bool UnaryOpMatch(lex::Tok op);
     KindType type() const { return TypeArray; }
 };
 
@@ -191,8 +191,8 @@ public:
     Type* getBaseType() const {return base;}
     int getDefCount() const { return size; }
     KindType type() const { return TypePointer; }
-    bool UnaryOpMatch(lex::Token_type op);
-    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
+    bool UnaryOpMatch(lex::Tok op);
+    Type* OperationFinalOutput(lex::Tok op, const Type* type);
 };
 
 class RefType: public Type{
@@ -204,8 +204,8 @@ public:
 
     Type* getBaseType() const {return base;}
     KindType type() const { return TypeRef; }
-    bool UnaryOpMatch(lex::Token_type op);
-    Type* OperationFinalOutput(lex::Token_type op, const Type* type);
+    bool UnaryOpMatch(lex::Tok op);
+    Type* OperationFinalOutput(lex::Tok op, const Type* type);
 };
 
 class TypeGenerator{
@@ -215,7 +215,7 @@ class TypeGenerator{
     static FloatType* GenerateFltType(uint16_t bit);
     static ArrayType* GenerateArrType(Type* &base, int size);
     static PointerType* GeneratePtrType(int count,Type* base);
-    static StructType* GenerateStructType(std::vector<std::string>&str, std::vector<Type*>&ty,std::vector<lex::tokt>&temp);
+    static StructType* GenerateStructType(std::vector<std::string>&str, std::vector<Type*>&ty,std::vector<lex::Lexeme>&temp);
     static FunctionType* GenerateFuncType(std::vector<Type*>&p_type, Type* r_type);
     static EnumType* GenerateEnumType(std::vector<std::string>&uData, std::vector<Type*>&type);
     static RefType* GenerateRefType(Type*&ty);

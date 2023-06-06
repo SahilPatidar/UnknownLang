@@ -5,7 +5,7 @@
 //#include "../../include/Error.hpp"
 namespace lex
 {
-    const char *token[_LAST] = {
+    const char *TokenMap[_LAST] = {
         "INT",
         "STR",
         "CHAR",
@@ -17,9 +17,10 @@ namespace lex
         "while",
         "as",
         "in",
-        "import",
+        "mod",
         "type",
         "const",
+        "static",
         "fn",
         "for",
         "let",
@@ -44,8 +45,9 @@ namespace lex
         "ui16",
         "ui32",
         "ui64",
-        "f32", 
-        "f64",
+        "ui128",
+        "flt32", 
+        "flt64",
 
         "=",
         "+",
@@ -113,14 +115,9 @@ namespace lex
     #define CUR (src[i])
     #define NXT (i < str_len?src[i+1]:0)
     #define PRV (str_len > 0&&i > 0?src[i-1]:0)
-    Token_type get_keyword(std::string &src);
-     bool get_operator(const std::string &src, Token_type &op_type, int &i);
-    std::string get_string(const std::string &src, int &i);
-    bool get_const_string(const std::string &src, int &i, char &quote, std::string &str);
-    bool get_num(const std::string &src, int &i, int base, std::string &num, Token_type &type);
-    
 
-    bool tokenizer(const std::string &src, tok_t &toks,int begin, int end){
+
+    bool Lexer::tokenizer(const std::string &src, std::vector<Lexeme> &toks, int begin, int end){
         int i = begin;
         bool comment_line = false;
         bool comment_block = false;
@@ -175,7 +172,7 @@ namespace lex
                     return false;
                 }
                 Token_type tok_name = get_keyword(str);
-                toks.push_back(tokt(line, i - line_start, str, tok_name));
+                toks.emplace_back(TokData(line, i - line_start, str), Tok(tok_name));
                 continue;
             }
 
@@ -187,7 +184,7 @@ namespace lex
                     printf("error: number\n");
                     return false;
                 }
-                toks.push_back(tokt(line, i - line_start, str ,type));
+                toks.emplace_back(TokData(line, i - line_start, str),Tok(type));
                 continue;
 
             }
@@ -199,62 +196,64 @@ namespace lex
                     printf("error in const string %d\n",i);
                     return false;
                 }
-                toks.push_back(tokt(line, i - line_start , str, quote=='\"'?STR:CHAR));
+                toks.emplace_back(TokData(line, i - line_start , str),Tok(quote=='\"'?STR:CHAR));
                 continue;
             }
             Token_type type = INVALID;
             if(get_operator(src, type, i)){
-                toks.push_back(tokt(line, i - line_start, token[type], type));
+                toks.emplace_back(TokData(line, i - line_start, TokenMap[type]), Tok(type));
                 continue;
             }
             std::cout<<"error :: expected token "<<src[i]<<std::endl;
             exit(1);
         }
-        toks.push_back(tokt(line, i - line_start , token[FEOF], FEOF));
+        toks.emplace_back(TokData(line, i - line_start , TokenMap[FEOF]), Tok(FEOF));
         return true;
     }
 
     
-    Token_type get_keyword(std::string &src) {
-        if(src == token[FOR])return FOR;
-        if(src == token[EXTERN])return EXTERN;
-        if(src == token[WHILE])return WHILE;
-        if(src == token[IF])return IF;
-        if(src == token[AS])return AS;
-        if(src == token[ELSE])return ELSE;
-        if(src == token[FN])return FN;
-        if(src == token[SELF])return SELF;
-        if(src == token[STRUCT])return STRUCT;
-        if(src == token[METHOD])return METHOD;
-        if(src == token[NIL])return NIL;
-        if(src == token[CONTINUE])return CONTINUE;
-        if(src == token[BREAK])return BREAK;
-        if(src == token[TRUE])return TRUE;
-        if(src == token[TYPE])return TYPE;
-        if(src == token[RETURN])return RETURN;
-        if(src == token[FALSE])return FALSE;
-        if(src == token[CONST])return CONST;
-        if(src == token[LET])return LET;
-        if(src == token[IN])return IN;
-        if(src == token[ENUM])return ENUM;
-        if(src == token[IMPORT])return IMPORT;
-        if(src == token[BOOL])return BOOL;
-        if(src == token[I8])return I8;
-        if(src == token[I16])return I16;
-        if(src == token[I32])return I32;
-        if(src == token[I64])return I64;
-        if(src == token[I128])return I128;
-        if(src == token[UI8])return UI8;
-        if(src == token[UI16])return UI16;
-        if(src == token[UI32])return UI32;
-        if(src == token[UI64])return UI64;
-        if(src == token[F32])return F32;
-        if(src == token[F64])return F64;
+    Token_type Lexer::get_keyword(std::string &src) {
+        if(src == TokenMap[FOR])return FOR;
+        if(src == TokenMap[EXTERN])return EXTERN;
+        if(src == TokenMap[WHILE])return WHILE;
+        if(src == TokenMap[IF])return IF;
+        if(src == TokenMap[AS])return AS;
+        if(src == TokenMap[ELSE])return ELSE;
+        if(src == TokenMap[FN])return FN;
+        if(src == TokenMap[SELF])return SELF;
+        if(src == TokenMap[STRUCT])return STRUCT;
+        if(src == TokenMap[METHOD])return METHOD;
+        if(src == TokenMap[NIL])return NIL;
+        if(src == TokenMap[CONTINUE])return CONTINUE;
+        if(src == TokenMap[BREAK])return BREAK;
+        if(src == TokenMap[TRUE])return TRUE;
+        if(src == TokenMap[TYPE])return TYPE;
+        if(src == TokenMap[RETURN])return RETURN;
+        if(src == TokenMap[FALSE])return FALSE;
+        if(src == TokenMap[CONST])return CONST;
+        if(src == TokenMap[STATIC])return STATIC;
+        if(src == TokenMap[LET])return LET;
+        if(src == TokenMap[IN])return IN;
+        if(src == TokenMap[ENUM])return ENUM;
+        if(src == TokenMap[MOD])return MOD;
+        if(src == TokenMap[BOOL])return BOOL;
+        if(src == TokenMap[I8])return I8;
+        if(src == TokenMap[I16])return I16;
+        if(src == TokenMap[I32])return I32;
+        if(src == TokenMap[I64])return I64;
+        if(src == TokenMap[I128])return I128;
+        if(src == TokenMap[UI8])return UI8;
+        if(src == TokenMap[UI16])return UI16;
+        if(src == TokenMap[UI32])return UI32;
+        if(src == TokenMap[UI64])return UI64;
+        if(src == TokenMap[UI128])return UI128;
+        if(src == TokenMap[F32])return F32;
+        if(src == TokenMap[F64])return F64;
 
         return IDEN;
     }
 
-    std::string  get_string(const std::string &src, int &i){
+    std::string  Lexer::get_string(const std::string &src, int &i){
         int str_len = src.size();
         std::string str;
         while (i < str_len)
@@ -268,7 +267,7 @@ namespace lex
         return str;
     }
 
-    bool get_const_string(const std::string &src, int &i, char &quote, std::string &str){
+    bool Lexer::get_const_string(const std::string &src, int &i, char &quote, std::string &str){
         quote = CUR;
         int start_pos = i;
         ++i;
@@ -303,7 +302,7 @@ namespace lex
         return true;
     };
 
-    bool get_num(const std::string &src, int &i, int base, std::string &num, Token_type &type){
+    bool Lexer::get_num(const std::string &src, int &i, int base, std::string &num, Token_type &type){
         int str_len = src.size();
         bool hex = false;
         int frist_digit = i;
@@ -398,7 +397,7 @@ namespace lex
       op_type = type; \
       break                                 
 
-    bool get_operator(const std::string &src, Token_type &op_type, int &i) {
+    bool Lexer::get_operator(const std::string &src, Token_type &op_type, int &i) {
         int str_len = src.size();
         int first_op = i;
         switch(CUR){
@@ -411,7 +410,7 @@ namespace lex
                     // }else 
                     if(NXT == '='){
                         ++i;
-                        SET(ASSN_PLUS);
+                        SET(ASN_PLUS);
                     }
                 }
                SET(PLUS);
@@ -425,7 +424,7 @@ namespace lex
                     // }else 
                     if(NXT == '='){
                         ++i;
-                       SET(ASSN_MINUS);
+                       SET(ASN_MINUS);
                     }else if(NXT == '>'){
                         ++i;
                         SET(ARROW);
@@ -438,17 +437,17 @@ namespace lex
                 if(i < str_len - 1){
                     if(NXT == '='){
                         ++i;
-                        SET(ASSN_MOD); 
+                        SET(ASN_MOD); 
                     }
                 }
-                SET(MOD);
+                SET(MODULO);
             }
             case '*':
             {
                 if(i < str_len - 1){
                     if(NXT == '='){
                         ++i;
-                        SET(ASSN_STAR);
+                        SET(ASN_STAR);
                     }
                 }
                 SET(STAR);
@@ -461,14 +460,14 @@ namespace lex
                         SET(EQL);
                     }
                 }
-                SET(ASSN);
+                SET(ASN);
             }
             case '/':
             {
                 if(i < str_len - 1){
                     if(NXT == '='){
                         ++i;
-                        SET(ASSN_DIV);
+                        SET(ASN_DIV);
                     }
                 }
                 SET(DIV);
@@ -478,26 +477,26 @@ namespace lex
                 if(i < str_len - 1){
                     if(NXT == '='){
                         ++i;
-                        SET(AND_ASSN);
+                        SET(ASN_AND);
                     }else if(NXT == '&'){
                         ++i;
-                        SET(AND);
+                        SET(CND_AND);
                     }
                 }
-                SET(AND_OP);
+                SET(AND);
             }
             case '|':
              {
                 if(i < str_len - 1){
                     if(NXT == '='){
                         ++i;
-                        SET(OR_ASSN);
+                        SET(ASN_OR);
                     }else if(NXT == '|'){
                         ++i;
-                        SET(OR);
+                        SET(CND_OR);
                     }
                 }
-                SET(OR_OP);
+                SET(OR);
             }
             case '!':
              {
@@ -514,10 +513,10 @@ namespace lex
                 if(i < str_len - 1){
                     if(NXT == '='){
                         ++i;
-                        SET(NOT_ASSN);
+                        SET(ASN_NOT);
                     }
                 }
-                SET(NOT_OP);
+                SET(NOT);
             }
             case '<':
             {
@@ -530,7 +529,7 @@ namespace lex
                         if(i < str_len - 1){
                             ++i;
                             if(NXT == '='){
-                                SET(LSHIFT_ASSN);
+                                SET(ASN_LSHIFT);
                             }
                         }
                         SET(LSHIFT);
@@ -548,7 +547,7 @@ namespace lex
                         ++i;
                         if(i < str_len - 1){
                             if(NXT == '='){
-                                SET(RSHIFT_ASSN);
+                                SET(ASN_RSHIFT);
                             }
                         }
                         SET(RSHIFT);
@@ -561,10 +560,10 @@ namespace lex
                 if(i < str_len - 1){
                     if(NXT == '='){
                         ++i;
-                        SET(XOR_ASSN);
+                        SET(ASN_XOR);
                     }
                 }
-                SET(XOR_OP);
+                SET(XOR);
             }
             case ':':
                 if(i < str_len - 1){

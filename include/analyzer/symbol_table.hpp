@@ -8,40 +8,6 @@
 using namespace ast;
 
 
-// template<typename T>
-// class SymTable{
-//     private:
-//     std::map<std::string,T>extrnt;
-//     std::map<std::string,T>sym;
-//     std::map<std::string,T>Structs;
-//     SymTable<T>*p_table;
-//     bool islocal = false;
-//     public:
-//     SymTable(SymTable<Type*>*&table);
-//     bool insert(std::string val, T type) {
-
-//         return true;
-//     }
-//     void setFlag(bool flag);
-
-//     bool contain(std::string key, bool inloc) {
-
-//         return false;
-//     }
-//     bool contains(std::string key) {
-
-//         return false;
-//     }
-
-//     T get(std::string key) {
-
-//     }
-
-//     bool pop() {
-//         local.clear();
-//     }
-// };
-
 struct AstNodeInfo {
     Type* type;
     ast::VALUE* val;
@@ -61,6 +27,7 @@ public:
     AstNodeInfo* getAllInfo(std::string &n)  { 
         return info.find(n) == info.end()? 0: &info[n]; 
     }
+    bool isempty() { info.empty(); }
     Type* getTypeInfo(std::string &n)  { 
         return info.find(n) == info.end()? 0: info[n].type; 
     }
@@ -71,7 +38,7 @@ public:
 
 class Stack{
 private:
-    std::vector<StackVal*>stack;
+    std::vector<StackVal>stack;
 public:
     Stack();
     ~Stack();
@@ -80,14 +47,15 @@ public:
     bool pop_back() { stack.pop_back(); }
     bool empty() { stack.empty(); }
     bool add(std::string &n, Type *&type, ast::VALUE *&val, Ast *&Node) {
-        stack.back()->add(n, (AstNodeInfo){type, val, Node});
+        stack.back().add(n, (AstNodeInfo){type, val, Node});
     }
-    StackVal* get_back() const { return stack.back()? stack.back(): 0; }
+    bool Has(std::string &n);
+    AstNodeInfo* get_all_info();
+    Type* get_type();
+    ast::VALUE* get_val();
+    Ast* get_node();
 };
 
-/// check undef and replace it;
-/// impl grammer
-/// assert
 
 class Registry{
 private:
@@ -122,18 +90,6 @@ public:
     }
     void updateGlobalInfo(std::string n, Type *type, ast::VALUE *val, Ast* Node) {
         globalDecl[n] = (AstNodeInfo){type,val,Node};
-    }
-    bool ContainsWithNoDef(std::string n) {
-        if(Decl.find(n) != Decl.end()){
-            return true;
-        }
-        return false;
-    }
-    Type* getNoDefDecl(std::string n) {
-        return globalDecl.at(n).type;
-    }
-    void setunDefDecl(std::string n, bool is){
-
     }
     Stack getStack() { return localStack; }
     FunctionType* getFuncBack() { return func.back(); }

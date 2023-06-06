@@ -1,120 +1,104 @@
 #include<iostream>
-#include"parser/Ast.hpp"
-#include"analyzer/AstVisitor.hpp"
+#include"../../include/parser/Ast.hpp"
+#include"../../include/analyzer/AstVisitor.hpp"
 namespace ast{
 
-void Program::accept(AstVisitor &visitor) const {
-    if(!visitor.visit(*this)){
-        //for()
-    }
+
+// bool BlockStmt::accept(AstVisitor &visitor) {
+//     return visitor.visit(this);
+// }
+
+bool ForLoop::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
-void BlockStatement::accept(AstVisitor &visitor) const {
-    if(!visitor.visit(*this)){
-        //for()
-    }
+bool FunctionDef::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
-void ForInLoop::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool VarStmt::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
-void FunctionDef::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool BranchStmt::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
-void VarState::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
-}
-
-void BranchState::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
-}
-
-void StructState::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool StructStmt::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
 
-void ReturnState::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool ReturnStmt::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
-void IfStatement::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
-}
-
-
-void BoolLiteral::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
-}
-
-void NumericLiteral::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
-}
-
-void NullLiteral::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
-}
-
-void StringLiteral::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
-}
-
-void FloatLiteral::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool IfStmt::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
 
-void BineryExper::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool BoolLiteral::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
-void AssignmentExpr::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool NumericLiteral::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
+}
+
+bool NullLiteral::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
+}
+
+bool StringLiteral::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
+}
+
+bool FloatLiteral::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
 
-void PrefixExper::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool Expression::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
-void PointerExpr::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool PostfixExpr::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
-void ListExpr::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+
+bool PrefixExpr::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
-void Tuple::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+
+bool ListExpr::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
-void FunctionCall::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool Array::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
-void MemberExpr::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool FunctionCall::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
   
-void IndexExpr::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
-}
+// bool IndexExpr::accept(AstVisitor &visitor) {
+//     return visitor.visit(this);
+// }
 
-void Parameter::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool Extern::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
   
-
-
-void ArrayType::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool Method::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
-void PreDefType::accept(AstVisitor &visitor) const {
-    visitor.visit(*this);
+bool PreDefineType::accept(AstVisitor &visitor) {
+    return visitor.visit(this);
 }
 
 

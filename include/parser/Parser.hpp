@@ -2,39 +2,33 @@
 
 #include<iostream>
 #include"Ast.hpp"
+#include"../Module.hpp"
 
 using namespace ast;
 namespace parser{
     using namespace lex;
-
-
-     enum KindExpression {
-        KExpr_Identifier,
-        KExpr_StructInit,
-        KExpr_ArrayInit,
-        KExpr_ArrayAccess,
-        KExpr_DotDot,
-        KExpr_DotArrow,
-        KExpr_Call,
-        KExpr_Grouped,
-        KExpr_Unary,
-        KExpr_Binary,
-        KExpr_Self,
-        KExpr_Literal,
-    };
-
+ 
     class ParserHelper{
+    private:
+        std::vector<Lexeme> toks;
+        uint idx;
     public:
-        tok_t toks;
-        uint CurrentIndex;
-        // std::string path;
-        // std::string file_name;
-        Token_type CurrentToken;
-        tokt next_t();
-        tokt getTok();
+        ParserHelper(std::vector<Lexeme> &_toks)
+        :toks(_toks) { idx = 0;}
+
+        inline Lexeme next_l();
+        inline Tok next_t();
+        inline Token_type next_tt();
+
+        inline Lexeme peek_l();
+        inline Tok peek_t();
+        inline Token_type peek_tt();
+
         inline uint getIndex();
-        inline uint getCurToken();
         inline void next();
+        inline Lexeme at(int i);
+        inline Tok at_t(int i);
+        inline Token_type at_tt(int i);
 
         void dump(std::string msg);
         void dump2(std::string msg);
@@ -44,22 +38,22 @@ namespace parser{
         inline bool checkh(Token_type tok);
         inline bool checkNH(Token_type tok, int i);
         int preced(Token_type op);
-        inline bool ArithmeticOP(Token_type tok);
-        inline bool ConditionalOP(Token_type tok);
-        inline bool LogicalOP(Token_type tok);
-        inline bool UnaryOP(Token_type tok);
-        inline bool BinaryOP(Token_type tok);
-        inline bool AssignOP(Token_type tok);
-        inline bool isLiteral(Token_type tok);
-        bool isTerminal(Token_type tok);
-        inline bool PreDefType(Token_type tok);
     };
 
     class Parser{
     private:
-        
+        module::Module modctx;
+        module::Mod mod;
+    public:
+        Parser(module::Module &_modctx);
+        Parser(module::Mod &_modctx);
+        ~Parser();
+
+        bool parse();
+    private:
         bool ParseBlock(ParserHelper &P, Ast *&ResultantNode, bool isBrace);
         bool ParseMethod(ParserHelper &P, Ast *&ResultantNode);
+        bool ParseUseStmt(ParserHelper &P, Ast *&ResultantNode);
         bool ParseWhileStmt(ParserHelper &P, Ast *&ResultantNode);
         bool ParseReturnStmt(ParserHelper &P, Ast *&ResultantNode);
         bool ParseType(ParserHelper &P, Ast *&ResultantNode);
@@ -68,18 +62,20 @@ namespace parser{
         bool ParseCall(ParserHelper &P, Ast *&ResultantNode);
         bool ParseListExpr(ParserHelper &P, Ast *&ResultantNode);
         bool ParseCastExpr(ParserHelper &P, Ast *&ResultantNode);
-        bool ParsePrefixExpr(ParserHelper &P, Ast *&ResultantNode, KindExpression Expr);
+        bool ParsePrefixExpr(ParserHelper &P, Ast *&ResultantNode);
         bool ParseExpr(ParserHelper &P, Ast *&ResultantNode);
         bool ParseExpr1(ParserHelper &P, Ast *&ResultantNode, int Precedance);
-        bool ParseExpr2(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr);
-        bool ParseExpr3(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr);
-        bool ParseExpr4(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr);
-        bool ParseExpr5(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr);
-        bool ParseExpression(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr);
+        bool ParseExpr2(ParserHelper &P, Ast *&ResultantNode);
+        bool ParseExpr3(ParserHelper &P, Ast *&ResultantNode);
+        bool ParseExpr4(ParserHelper &P, Ast *&ResultantNode);
+        bool ParseExpr5(ParserHelper &P, Ast *&ResultantNode);
+        bool ParseExpr6(ParserHelper &P, Ast *&ResultantNode);
+
+        bool ParseExpression(ParserHelper &P, Ast *&ResultantNode);
         bool ParseLiteral(ParserHelper &P, Ast *&ResultantNode);
-        bool ParseParenExpr(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr);
+        bool ParseParenExpr(ParserHelper &P, Ast *&ResultantNode);
         bool ParseIdentifier(ParserHelper &P, Ast *&ResultantNode);
-        bool ParseDotArrowExpr(ParserHelper &P, Ast *&ResultantNode, KindExpression &Expr);
+        bool ParseDotArrowExpr(ParserHelper &P, Ast *&ResultantNode);
         bool ParseStructExpr(ParserHelper &P, Ast *&ResultantNode);
         bool ParseArrayIndexExpr(ParserHelper &P, Ast *&ResultantNode);
         bool ParseBinaryExpr(ParserHelper &P, Ast *&ResultantNode, int prev_prece);
@@ -91,8 +87,8 @@ namespace parser{
         bool ParseForStmt(ParserHelper &P, Ast *&ResultantNode);
         bool ParseForInStmt(ParserHelper &P, Ast *&ResultantNode);
         bool ParseExtern(ParserHelper &P, Ast *&ResultantNode);
+        bool ParseMod(ParserHelper &P, Ast *&ResultantNode);
         bool ParseVarStmt(ParserHelper &P, Ast *&ResultantNode);
     };
 
 }
-
