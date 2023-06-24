@@ -5,27 +5,31 @@
 namespace ast {
     
     std::string NumericLiteral::toString() const{
-        return tok.data;
+        return tok.getStr();
     }
 
     std::string FloatLiteral::toString() const{
-        return tok.data;
+        return tok.getStr();
     }
 
     std::string BoolLiteral::toString() const {
-        return tok.data;
+        return tok.getStr();
     }
 
     std::string StringLiteral::toString() const {
-        return tok.data;
+        return tok.getStr();
     }
 
     std::string NullLiteral::toString() const {
-        return tok.data;
+        return tok.getStr();
     }
 
     std::string Identifier::toString() const {
-        return tok.data;
+        return tok.getStr();
+    }
+
+    Identifier* Identifier::Create(Lexeme &_tok) {
+        return new Identifier(_tok);
     }
 
     std::string BlockStmt::toString() const {
@@ -39,22 +43,21 @@ namespace ast {
 
     std::string Extern::toString() const {
         std::string str = "extern ";
-        for(int i = 0, size = header.size(); i < size; i++) {
-            str += header[i]->toString();
-        }
+        str += header->toString();
+        str += block->toString();
         return str;
     }
     
 
     std::string EnumExpr::toString() const {
         std::string str = "enum ";
-        str += Name.data;
+        str += Name.getStr();
         str += " {\n";
         for (size_t i = 0, size = udata.size(); i < size; i++) {
             if (i)
                 str += "\n";
 
-            str += udata[i].data;
+            str += udata[i].getStr();
             if(val[i]) {
                 str += " = ";
                 str += val[i]->toString();
@@ -67,13 +70,13 @@ namespace ast {
     }
 
     std::string PreDefineType::toString() const {
-        return tok.data;
+        return tok.getStr();
     }
 
     std::string TypeStmt::toString() const {
         std::string str = "type";
         str += " ";
-        str += Ident.data;
+        str += Ident.getStr();
         str += " ";
         str += type->toString();
         str += ";";
@@ -81,7 +84,7 @@ namespace ast {
     }
 
     std::string VarStmt::toString() const {
-        std::string str = tok.data;
+        std::string str = tok.getStr();
         str += " ";
         str += name->toString();
         str += " : ";
@@ -139,7 +142,7 @@ namespace ast {
     
     std::string PrefixExpr::toString() const {
         std::string str = "";
-        str += lex::token[op];
+        str += lex::TokenMap[op.getTokType()];
         str += base->toString();
         return str;
     }
@@ -184,31 +187,31 @@ namespace ast {
     }
     
     std::string BranchStmt::toString() const {
-        return tok.data + ";\n";
+        return tok.getStr() + ";\n";
     }
     
     std::string Expression::toString() const {
         std::string str = "";
         str += LHS->toString();
-        str += lex::token[Op];
+        str += lex::TokenMap[Op.getTokType()];
         str += RHS->toString();
         return str;
     }
     
     std::string StructStmt::toString() const {
         std::string str = "struct ";
-        str += Name.data;
+        str += Name.getStr();
         if(!Temp.empty()){
             str += "<";
             for(int i = 0 ; i < Temp.size(); i++){
-                str += Temp[i].data;
+                str += Temp[i].getStr();
                 str += ",";
             }
             str += ">";
         }
         str += "{\n";
         for(int i = 0 ; i < elmtName.size(); i++){
-            str += elmtName[i].data;
+            str += elmtName[i].getStr();
             str += ": ";
             str += elmtTy[i]->toString();
             str += ",\n";
@@ -227,14 +230,19 @@ namespace ast {
         return str;
     }
    
+    FunctionDef* FunctionDef::Create(Lexeme &_tok, Lexeme &_Name, std::vector<Lexeme> &_pName,
+                    std::vector<Ast *> &_pTy, Ast *  _retype, Ast * &_Block) {
+        FunctionDef* T = new FunctionDef(_tok, _Name, _pName, _pTy, _retype, _Block);
+
+    }
     std::string FunctionDef::toString() const {
         std::string str = "fn ";
-        str += Name.data;
+        str += Name.getStr();
         str += " ( ";
         if(!pName.empty()){
          
             for(size_t i = 0; i < pName.size(); i++){
-                str += pName[i].data;
+                str += pName[i].getStr();
                 str += pTy[i]->toString();
                 str += ",";
             }

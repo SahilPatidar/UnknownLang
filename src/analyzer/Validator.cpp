@@ -56,12 +56,16 @@ bool Validator::visit(VarStmt *AstNode ) {
     if(!AstNode->getVarName()->accept(*this)){
         return false;
     }
-    if(!AstNode->getType()->accept(*this)){
+    if(AstNode->IsConst()){
+        if(!AstNode->getType()->accept(*this)||!AstNode->getVal()->accept(*this)){
+            ///@todo
+            return false;
+        }
+    }else if(!AstNode->getType()->accept(*this)&&!AstNode->getVal()->accept(*this)){
+        ///@todo
         return false;
     }
-    if(!AstNode->getVal()->accept(*this)){
-        return false;
-    }
+    
     return true;
 }
 
@@ -356,7 +360,7 @@ bool Validator::visit(PrefixExpr *AstNode ) {
     }
 }
 
-bool Validator::visit(PostfixExpr *AstNode ) {
+bool Validator::visit(IndexExpr *AstNode ) {
 
 }
 

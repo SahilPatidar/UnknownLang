@@ -41,7 +41,7 @@ char* get_base_name(std::string &path) {
 
 
 bool get_root_mod_src(std::string &path, std::string &src, std::string &dirp, std::string &modname) {
-    dirp = get_dir_path(path);
+    dirp = get_dir_name(path);
     modname = get_base_name(path);
     if(dirp.empty()){
         return false;
@@ -65,10 +65,10 @@ bool get_sub_mod_src(std::string &path, std::string &modname, std::string &src, 
         return false;
     }
     if(f1){
-        dirp = get_dir_path(modpath1);
+        dirp = get_dir_name(modpath1);
         absp = modpath1;
     }else if(f2){
-        dirp = get_dir_path(modpath2);
+        dirp = get_dir_name(modpath2);
         absp = modpath2;
     }
     return true;

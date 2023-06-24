@@ -36,6 +36,8 @@ namespace ast{
         NodeGroupExpr,
         NodeStructDef,
         NodePath,
+        NodeSimplePath,
+        NodeTypePath,
 
         NodePreDefTy,
         NodeArray,
@@ -43,6 +45,7 @@ namespace ast{
         NodeRefTy,
         NodeFnTy,
         NodeConstTy,
+        NodeUserDefTy,
 
         NodeIfStm,
         NodeWhileStm,
@@ -71,6 +74,8 @@ namespace ast{
         Type *castTo;
         VALUE *value;
         Ast* Decl;
+        bool IsConst;
+        int DefCount;
     public:
         virtual ~Ast() = default;
 
@@ -87,6 +92,12 @@ namespace ast{
         inline bool setCastTo(Type *to) { 
             castTo = to;
         }
+        inline int getDefCount() const { return DefCount; }
+        inline void setDefCount(int count) { DefCount = count; }
+
+        inline bool IsConst() const { return IsConst; }
+        inline void setConst()  {  IsConst = true; }
+        inline void unSetConst() {  IsConst = false; }
         virtual Lexeme token() const = 0;
         virtual std::string toString() const = 0;
         virtual bool accept(AstVisitor& visitor) = 0;
@@ -205,7 +216,7 @@ namespace ast{
         Identifier(Lexeme &_tok)
             :tok(_tok) {}
 
-        static Identifier *Create(Lexeme &_tok);
+        static Identifier *Create( Lexeme &_tok);
         Lexeme token() const { return tok; }
         std::string getIdent() const { return tok.getStr(); }
         // bool HasSelf() const { return IsSelf; }
@@ -214,6 +225,7 @@ namespace ast{
         
         NodeCategory nodeCategory() const { return NodeIdent; }
     };
+
 
     class UseStmt: public Ast {
         private:
@@ -286,7 +298,7 @@ namespace ast{
         PreDefineType(Lexeme &_tok)
         : tok(_tok) 
         {}
-        static PreDefineType *Create(Lexeme &_tok);
+        static PreDefineType *Create(Lexeme _tok);
         Lexeme token() const{ return tok; }
         Tok getType() const{ return tok.getTok(); }
         Token_type getTType() const{ return tok.getTokTy(); }
@@ -296,6 +308,30 @@ namespace ast{
         NodeCategory nodeCategory() const {return NodePreDefTy;}
 
     };
+
+    class UserDefinedTy: public Ast{
+        private:
+        Lexeme tok;
+        Ast* Expr;
+        GenericParam *param;
+
+        //TypePtr typeinfo;
+        public:
+        UserDefinedTy(Lexeme &_tok, Ast* &_Expr, GenericParam *&_param)
+        : tok(_tok), Expr(_Expr), param(_param)
+        {}
+        static PreDefineType *Create(Lexeme &_tok, Ast* &_Expr, GenericParam *&_param);
+        Lexeme token() const{ return tok; }
+        Ast* getExpr() const{ return Expr; }
+        GenericParam* getGeneric() const{ return param; }
+        bool HasGeneric() const{ return param != NULL; }
+        std::string toString() const;
+        bool accept(AstVisitor& visitor);
+        
+        NodeCategory nodeCategory() const {return NodeUserDefTy;}
+
+    };
+
 
     class PrefixExpr: public Ast{
         private:
@@ -312,7 +348,6 @@ namespace ast{
         static PrefixExpr *Create(Lexeme &tok, Tok &_op, Ast * &_type, bool _isType, int _DefCount, NodeCategory _nodeKind);
         Lexeme token() const { return tok; }
         Tok getOp() const { return op; }
-        int getDefCount() const { return DefCount; }
         Ast * getBase() const { return base; }
         bool IsType() const { return isType; }
         std::string toString() const;
@@ -321,35 +356,26 @@ namespace ast{
         NodeCategory nodeCategory() const { return nodeKind; }
     };
 
-    
 
-    class PostfixExpr: public Ast{
+    class IndexExpr: public Ast{
         private:
         Lexeme tok;
         Ast * var;
-        std::vector<Lexeme>Temp;
-        std::vector<Ast *>inexpr;
-        NodeCategory nodeKind;
+        std::vector<Ast *>idx;
         // bool isType;
         public:
-        // PostfixExpr(Lexeme &tok,  Ast * &_var, std::vector<Lexeme>&_Temp, std::vector<Ast *> &_v, NodeCategory _nodeKind)
-        // : tok(tok), var(_var), Temp(_Temp), expr(_v), nodeKind(_nodeKind) {}
-        
-        // PostfixExpr(Lexeme &tok,  Ast * &_var, std::vector<Ast *> &_v, NodeCategory _nodeKind)
-        // : tok(tok), var(_var), expr(_v), nodeKind(_nodeKind) {}
+        IndexExpr(Lexeme &tok,  Ast * &_var, std::vector<Ast *> &_v)
+        : tok(tok), var(_var), idx(_v) {}
 
-        static PostfixExpr *Create(Lexeme &tok,  Ast * &_var, std::vector<Lexeme>&_Temp, std::vector<Ast *> &_v, NodeCategory _nodeKind);
-        static PostfixExpr *Create(Lexeme &tok,  Ast * &_var, std::vector<Ast *> &_v, NodeCategory _nodeKind);
+        static IndexExpr *Create(Lexeme &tok,  Ast * &_var, std::vector<Ast *> &_v);
         void SetType(Type *_type) { type = _type; }
         Lexeme token() const { return tok; }
         Ast * getVar() const { return var; }
-        std::vector<Lexeme> getTemp() const { return Temp; }
-        bool HasTemp() const {return !Temp.empty();}
-        std::vector<Ast *> getExpr() const { return inexpr; }
+        std::vector<Ast *> getIndex() const { return idx; }
         std::string toString() const;
         bool accept(AstVisitor& visitor);
         
-        NodeCategory nodeCategory() const { return nodeKind; }
+        NodeCategory nodeCategory() const { return NodeIndexExpr; }
     };
 
 
@@ -366,7 +392,7 @@ namespace ast{
         :LHS(_LHS),Op(_op), RHS(_RHS), NodeKind(_nodeKind)
         {}
 
-        static Expression *Create(Ast *_LHS, Tok _op, Ast *_RHS,
+        static Expression *Create(Ast *&_LHS, Tok _op, Ast *&_RHS,
                      NodeCategory _nodeKind);
         // Lexeme token() const {return tok;}
         Ast * getLhs() const {return LHS;}
@@ -459,15 +485,16 @@ namespace ast{
     class Extern: public Ast {
         private:
         Lexeme tok;
-        std::vector<Ast *> header;
+        Ast* header;
+        Ast* block;
         public:
-        Extern(Lexeme &_tok, std::vector<Ast *> &_header)
-        :tok(_tok), header(_header){}
+        Extern(Lexeme &_tok, Ast* &_header, Ast* &_block)
+        :tok(_tok), header(_header), block(_block){}
 
         static Extern *Create(Lexeme &_tok, std::vector<Ast *> &_header);
         Lexeme token() const {return tok;}
-        std::vector<Ast *> getHeader() const {return header;}
-        // Ast * getBlock()const {return block;}
+        Ast* getHeader() const {return header;}
+        Ast * getBlock()const {return block;}
         std::string toString() const;
         bool accept(AstVisitor& visitor);
         //void accept(AstVisitor &vistitor) const;
@@ -523,13 +550,13 @@ namespace ast{
     };
 
     class IfStmt: public Ast{
-        private:
+    private:
         Lexeme tok;
         Ast * cond;
         Ast * ifblock;
         Ast * elblock;
         
-        public:
+    public:
         IfStmt(Lexeme &_tok, Ast * &_cond , Ast * &_ifblock,
                              Ast * &_elblock)
         : tok(_tok), cond(_cond), ifblock(_ifblock), 
@@ -549,13 +576,13 @@ namespace ast{
 
 
     class BranchStmt: public Ast {
-        private:
+    private:
         Lexeme tok;
-        public:
+    public:
         BranchStmt(Lexeme &_tok)
         : tok(_tok) {}
 
-        static BranchStmt *Create(Lexeme &_tok);
+        static BranchStmt *Create(Lexeme _tok);
         Lexeme token() const { return tok; }
         std::string toString() const;
         bool accept(AstVisitor& visitor);
@@ -564,40 +591,54 @@ namespace ast{
     };
 
 
-    class StructStmt: public Ast {
-        private:
-        Lexeme tok;
-        Lexeme Name;
-        std::vector<Lexeme>Temp;
-        std::vector<Lexeme> elmtName;
-        std::vector<Ast *> elmtTy;
-        // bool isDecl;
-        public:
-        StructStmt(Lexeme &_tok, Lexeme &_Name, std::vector<Lexeme> &_Temp, std::vector<Lexeme> &_memName,
-                     std::vector<Ast *> &_memTy)
-        : tok(_tok), Name(_Name), Temp(_Temp), elmtName(_memName), elmtTy(_memTy) {}
+    class GenericParam{
+    private:
+        std::vector<Lexeme> param;
+    public:
+        GenericParam(std::vector<Lexeme> &_param) 
+        :param(_param) {}
 
-        static BranchStmt *Create(Lexeme &_tok, Lexeme &_Name, std::vector<Lexeme> &_Temp, std::vector<Lexeme> &_memName,
-                     std::vector<Ast *> &_memTy);
+        static GenericParam *Create(std::vector<Lexeme> &_memName);
+        std::vector<Lexeme> getParam() const { return param; }
+        bool Has() const { return !param.empty(); }
+    };
+    
+
+    class StructStmt: public Ast {
+    private:
+        Lexeme tok;
+        Ast* Ident;
+        GenericParam *param;
+        std::vector<Ast*> elmtName;
+        std::vector<Ast *> elmtTy;
+        NodeCategory kNode;
+    public:
+        StructStmt(Lexeme &_tok, Ast *&_Ident, GenericParam *&_param, std::vector<Ast*> &_memName,
+                     std::vector<Ast *> &_memTy,  NodeCategory &kNode)
+        : tok(_tok), Ident(_Ident), param(_param), elmtName(_memName), elmtTy(_memTy) {}
+
+        static StructStmt *Create(Lexeme &_tok, Ast *&_Ident, GenericParam *&_param, 
+                            std::vector<Ast*> &_memName, std::vector<Ast *> &_memTy,  NodeCategory kNode);
     
         Lexeme token() const { return tok; }
-        Lexeme getName() const { return Name; }
-        std::vector<Lexeme> getTemp() const { return Temp; }
-        bool HasTemplate() const { return !Temp.empty(); }
-        std::vector<Lexeme> getIdentList() const { return elmtName; }
+        Ast*  getName() const { return Ident; }
+        GenericParam* getGenParam() const { return param; }
+        std::vector<Lexeme> getGenParamList() const { return param->getParam(); }
+        bool HasGenParam() const { return !param->Has(); }
+        std::vector<Ast*> getIdentList() const { return elmtName; }
         std::vector<Ast *> getTypeList() const { return elmtTy; }
         std::string toString() const;
         bool accept(AstVisitor& visitor);
         
-        NodeCategory nodeCategory() const { return NodeStructStm; }
+        NodeCategory nodeCategory() const { return kNode; }
     };
 
 
     class ListExpr: public Ast {
-        private:
+    private:
         Lexeme tok;
         std::vector<Ast *>list;
-        public:
+    public:
         ListExpr(Lexeme &_tok, std::vector<Ast *> &_list)
         :tok(_tok), list(_list) {}
 
@@ -623,16 +664,14 @@ namespace ast{
         VarStmt(Lexeme &_tok, Ast * &_var, Ast * &_type, Ast * &_val, bool &_HasConst)
         : tok(_tok), name(_var), type(_type), val(_val), HasConst(_HasConst) {}
 
-        static ListExpr *Create(Lexeme &_tok, Ast *_var, Ast *_type, Ast *_val, bool _HasConst);
+        static VarStmt *Create(Lexeme &_tok, Ast *_var, Ast *_type, Ast *_val, bool _HasConst);
         Lexeme token() const{ return tok; }
         Ast * getVarName() const{return name;}
         Ast * getType() const{return type;}
         void SetType(Ast * &Type) { type = Type;}
         Ast * getVal() const{return val;}
-        bool HasConstStmt() const { return HasConst; }
-        // bool getHasIsStmt()const {return HasIsStmt;}
-        // TypePtr getType() const {return typeinfo;}
-        // void setType(const TypePtr _typeinfo) {typeinfo = _typeinfo;}
+        bool IsConst() const { return HasConst; }
+
         std::string toString() const;
         bool accept(AstVisitor& visitor);
         
@@ -644,22 +683,22 @@ namespace ast{
     private:
         Lexeme tok;
         Lexeme Name;
-        std::vector<Lexeme> pName;
-        std::vector<Ast *> pTy;
+        std::vector<Ast*> pName;
+        std::vector<Ast*> pTy;
         Ast * retype;
         Ast * Block;
         // bool isDecl;
     public:
-        FunctionDef(Lexeme &_tok, Lexeme &_Name, std::vector<Lexeme> &_pName,
+        FunctionDef(Lexeme &_tok, Lexeme &_Name, std::vector<Ast*> &_pName,
                     std::vector<Ast *> &_pTy, Ast *  _retype, Ast * &_Block)
          : tok(_tok), Name(_Name), pName(_pName), pTy(_pTy), 
             retype(_retype), Block(_Block){}
 
-        static FunctionDef *Create(Lexeme &_tok, Lexeme &_Name, std::vector<Lexeme> &_pName,
+        static FunctionDef *Create(Lexeme &_tok, Lexeme &_Name, std::vector<Ast*> &_pName,
                     std::vector<Ast *> &_pTy, Ast *  _retype, Ast * &_Block);
         Lexeme token() const { return tok; }
         Lexeme getFuncName() const { return Name; }
-        std::vector<Lexeme> getParameterNames() const { return pName; }
+        std::vector<Ast*> getParameterNames() const { return pName; }
         std::vector<Ast *> getParameterTy() const { return pTy; }
         Ast * getResultType() const { return retype; }
         Ast * getFuncBlock() const { return Block; }
@@ -700,7 +739,7 @@ namespace ast{
         : tok(_tok), name(_name), args(_args) {}
 
 
-        static FunctionCall *Create(Lexeme &_tok, Ast *_name, std::vector<Ast *>&_args);
+        static FunctionCall *Create(Lexeme &_tok, Ast *_name, std::vector<Ast *>_args);
         Lexeme token() const { return tok; }
         Ast * getCalle() const { return name; }
         std::vector<Ast *> getArgs() const { return args; }

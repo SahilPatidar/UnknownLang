@@ -1,20 +1,23 @@
 #include"../../include/codegen/LLVMCodeGen.hpp"
 #include"llvm/ADT/StringRef.h"
+#include"llvm/IR/ConstantFold.h"
+#include"llvm/IR/Constant.h"
 #include<iostream>
+#include<stdlib.h>
 
 namespace codegen{
     Value *IRCodegenVisitor::visit(const ast::NumericLiteral &AstNode) {
         return ConstantInt::get(Type::getInt32Ty(*TheContext),
-                                    std::to_integer(AstNode.toString()));
+                                    stoi(AstNode.toString()));
     }
 
     Value *IRCodegenVisitor::visit(const ast::FloatLiteral &AstNode) {
         return ConstantFP::get(*TheContext,
-                                      APFoat(std::to_integer(AstNode.toString())));
+                                      APFoat(stoi(AstNode.toString())));
     }
 
     Value *IRCodegenVisitor::visit(const ast::BoolLiteral &AstNode) {
-        switch (AstNode.token().tok_type)
+        switch (AstNode.token().getTokTy())
         {
         case TRUE:
             return ConstantInt::getBool(*TheContext, true);
@@ -31,7 +34,7 @@ namespace codegen{
     }
     
     Value *IRCodegenVisitor::visit(const ast::PreDefineType &AstNode) {
-        switch (AstNode.getType())
+        switch (AstNode.getType().getTokType())
         {
         case I8:
             return Builder->getInt8Ty();
@@ -57,13 +60,13 @@ namespace codegen{
         return nullptr;
     }
 
-    Value *IRCodegenVisitor::visit(const ast::BineryExpr &AstNode) {
-        Value *L = AstNode.left()->accept(*this);
-        Value *R = AstNode.right()->accept(*this);
+    Value *IRCodegenVisitor::visit(const ast::Expression &AstNode) {
+        Value *L = AstNode.getLhs()->accept(*this);
+        Value *R = AstNode.getRhs()->accept(*this);
         if (!L || !R)
             return nullptr;
         
-        switch (AstNode.Operator())
+        switch (AstNode.getOp().getTokType())
         {
         case STAR:
             return Builder->CreateFMul(L,R,"multmp");
@@ -77,7 +80,7 @@ namespace codegen{
         case MOD:
             return Builder->CreateFMod(L,R,"modtmp");
             break;
-        case AND_OP:
+        case AND:
             /* code */
             break;
         
@@ -89,7 +92,7 @@ namespace codegen{
     }
 
 }
-Value *IRCodegenVisitor::visit(const ast::BlockStatement &AstNode) {
+Value *IRCodegenVisitor::visit(const ast::BlockStmt &AstNode) {
     for(int i = 0, siz = AstNode.getStmts().size(); i < siz; i++) {
 
     }

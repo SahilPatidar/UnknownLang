@@ -1,0 +1,13 @@
+## intialized or not
+## const 
+## Template 
+## Module 
+## Path 
+## Self / Method 
+## Type Casting
+## Type Def
+## Any or void
+## NULL
+## Variadic
+## Replace code with original with mangle name
+## module type checking go through not by all over instead go through call by call.

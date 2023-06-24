@@ -17,15 +17,15 @@ protected:
     virtual bool visit(BranchStmt *AstNode ){ return false; }
     virtual bool visit(VarStmt *AstNode ){ return false; }
     virtual bool visit(IfStmt *AstNode ){ return false; }
+    virtual bool visit(UseStmt *AstNode ){ return false; }
     virtual bool visit(ReturnStmt *AstNode ){ return false; }
     
     virtual bool visit(GroupedExpr *AstNode ){ return false; }
-    virtual bool visit(Expression *AstNode ){ return false; }
     virtual bool visit(ListExpr *AstNode ) { return false; };
     virtual bool visit(FunctionCall *AstNode ){ return false; }
     virtual bool visit(Expression *AstNode ){ return false; }
+    virtual bool visit(IndexExpr *AstNode ){ return false; }
     virtual bool visit(PrefixExpr *AstNode ){ return false; }
-    virtual bool visit(PostfixExpr *AstNode ){ return false; }
     
     virtual bool visit(Array *AstNode ) { return false; }
     virtual bool visit(FnType *AstNode ) { return false; }

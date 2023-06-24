@@ -164,10 +164,13 @@ namespace lex
             tok == STAR|| tok == AND ||tok == NOT || tok == CND_NOT;
         }
 
-        inline bool IsAssignOP() const {
-            return tok == ASN|| tok == ASN_DIV||
+        inline bool IsAssnCombinedOP() const {
+            return tok == ASN_DIV||
             tok == ASN_MINUS|| tok == ASN_MOD||tok == ASN_PLUS|| tok == ASN_STAR|| 
             tok == ASN_AND|| tok == ASN_XOR||tok == ASN_OR|| tok == ASN_NOT;
+        }
+        inline bool IsAssignOP() const {
+            return tok == ASN;
         }
         
         inline bool IsPreDefType() const {

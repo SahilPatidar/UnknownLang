@@ -4,8 +4,8 @@
 namespace parser {
     
     void ParserHelper::next() {
-        if(CurrentIndex + 1 < toks.size()) {
-            ++CurrentIndex;
+        if(idx + 1 < toks.size()) {
+            ++idx;
         }
     }
 
@@ -38,7 +38,7 @@ namespace parser {
     }
 
     Lexeme ParserHelper::next_l() {
-        return (CurrentIndex+1 < toks.size())?toks[CurrentIndex+1]:toks[CurrentIndex];
+        return (idx+1 < toks.size())?toks[idx+1]:toks[idx];
     }
 
     Tok ParserHelper::next_t() {
@@ -50,7 +50,7 @@ namespace parser {
     }
 
     Lexeme ParserHelper::peek_l() {
-        return toks[CurrentIndex];
+        return toks[idx];
     }
 
     Tok ParserHelper::peek_t() {

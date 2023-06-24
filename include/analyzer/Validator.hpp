@@ -27,7 +27,7 @@ public:
     bool visit(FunctionCall *AstNode );
     bool visit(Expression *AstNode );
     bool visit(PrefixExpr *AstNode );
-    bool visit(PostfixExpr *AstNode );
+    bool visit(IndexExpr *AstNode );
     
     bool visit(Array *AstNode ) ;
     bool visit(FnType *AstNode ) ;

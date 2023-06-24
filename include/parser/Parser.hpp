@@ -43,7 +43,7 @@ namespace parser{
     class Parser{
     private:
         module::Module modctx;
-        module::Mod mod;
+        module::Mod Mod;
     public:
         Parser(module::Module &_modctx);
         Parser(module::Mod &_modctx);
@@ -71,6 +71,10 @@ namespace parser{
         bool ParseExpr5(ParserHelper &P, Ast *&ResultantNode);
         bool ParseExpr6(ParserHelper &P, Ast *&ResultantNode);
 
+        bool ParseGenericParam(ParserHelper &P, GenericParam *&ResultantNode);
+        bool ParseTypePath(ParserHelper &P, Ast *&ResultantNode);
+
+        bool ParsePath(ParserHelper &P, Ast *&ResultantNode);
         bool ParseExpression(ParserHelper &P, Ast *&ResultantNode);
         bool ParseLiteral(ParserHelper &P, Ast *&ResultantNode);
         bool ParseParenExpr(ParserHelper &P, Ast *&ResultantNode);

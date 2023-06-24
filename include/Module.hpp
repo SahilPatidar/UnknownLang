@@ -6,6 +6,8 @@
 #include"Driver.hpp"
 #include"parser/Ast.hpp"
 #include"parser/Parser.hpp"
+#include"utils/File.hpp"
+#include"analyzer/TypeChecker.hpp"
 namespace module{
 
 
@@ -30,7 +32,7 @@ public:
     ModuleItems();
     ~ModuleItems();
 
-    bool addItem(std::string &s, ast::Ast *&node);
+    bool addItem(std::string s, ast::Ast *&node);
     ast::Ast* getItem(std::string &n) { 
         return moditem.find(n) == moditem.end()? 0: moditem[n];
     }
@@ -75,13 +77,20 @@ public:
 
     ~Module();
     std::map<std::string, Module> getSubMods() const { return submods; }
-    Module getSubMod(std::string &s) const;
+    Module* getSubMod(std::string &s) const;
 
     /// module info
     std::string getDirPath() const { return modinfo.dirpath; }
     std::string getPath() const { return modinfo.path; }
     std::string getSrc() const { return modinfo.src; }
 
+    bool TypePass() {
+        analyzer::TypeChecker typecheck(*this);
+        if(typecheck.CheckType()){
+            ///@todo
+            return false;
+        }
+    }
     std::string getModId() const { return modinfo.modname; }
     ast::Ast* getModItems(std::string &s) const;
 };  
@@ -96,6 +105,8 @@ struct Mod{
     std::vector<lex::Lexeme>toks;
     ModuleItems moditem;
 };
+
+
 
 class ModuleBuilder{
 private:

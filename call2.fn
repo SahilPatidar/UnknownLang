@@ -1,13 +1,16 @@
-
-#import
-
+use std::io::{
+    Vec as vec,
+    Vec as vec
+};
+ 
 
 struct vector<T>{
-a:*type,
-b:*T
+a:*T,
+b:
 };
 
-impl vector<T> {
+
+impl vector<i32>   {
     fn new(t:type) -> {
         
     }
@@ -17,6 +20,7 @@ extern["stdio.h"] fn write();
 extern["stdio.h"] call:i32;
 
 fn main() -> i32 {
-
+    let b : i32 = 0;
+    let immut a : *immut i32 = &b;
 }
 

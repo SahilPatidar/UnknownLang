@@ -19,6 +19,7 @@ namespace lex
         "in",
         "mod",
         "type",
+        // "any", //new
         "const",
         "static",
         "fn",

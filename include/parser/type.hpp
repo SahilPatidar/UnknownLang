@@ -18,7 +18,8 @@ const enum KindType {
     TypeConst,
     TypeFunction,
     TypeEnum,
-    TypeRef
+    TypeRef,
+    TypeContainedTy
 };
 
 
@@ -33,7 +34,7 @@ public:
  virtual bool UnaryOpMatch(lex::Tok op);
  virtual bool IsCastRequire(Type *tofrom);
  virtual bool IsCastable(Type *tofrom);
- virtual bool IsValidOperation(Tok op, Type* Ty);
+ virtual bool IsValidOperation(lex::Tok op, Type* Ty);
  virtual KindType type() const = 0;
  inline bool isConst() const { return IsConst; }
  inline void setConst(bool _isConst) { IsConst = _isConst; }
@@ -48,9 +49,13 @@ public:
     IntType(uint16_t &_bit, bool &isSign)
     :bit(_bit), isSign(isSign){}
 
+    bool IsCastRequire(Type *tofrom);
+    bool IsCastable(Type *tofrom);
+    bool IsValidOperation(lex::Tok op, Type* Ty);
+
     bool isSignInt() const {return isSign;}
     int getbit() const {return bit;}    
-    Type* OperationFinalOutput(lex::Tok op, const Type* type);
+    Type* OperationFinalOutput(lex::Tok op, const Type* type) const;
     bool UnaryOpMatch(lex::Tok op);
     KindType type() const { return TypeInt; }
 };
@@ -63,6 +68,11 @@ private:
 public:
     FloatType(uint16_t &_bit)
     :bit(_bit) {}
+   
+    bool IsCastRequire(Type *tofrom);
+    bool IsCastable(Type *tofrom);
+    bool IsValidOperation(lex::Tok op, Type* Ty);
+   
     int getbit() const {return bit;}
     Type* OperationFinalOutput(lex::Tok op, const Type* type);
     bool UnaryOpMatch(lex::Tok op);
@@ -126,10 +136,10 @@ private:
     std::map<std::string, Type*>EleNameTypeList;
     std::vector<std::string>NameList;
     std::vector<Type*>TypeList;
-    std::vector<Lexeme>Temp;
+    std::vector<TypeTy*>Temp;
     std::map<std::string,Type*>Impl;
 public:
-    StructType(std::map<std::string, Type*>&_EleNameTypeList, std::vector<Lexeme>&_Temp) 
+    StructType(std::map<std::string, Type*>&_EleNameTypeList, std::vector<TypeTy*>&_Temp) 
     :EleNameTypeList(_EleNameTypeList), Temp(_Temp) {}
 
     std::map<std::string, Type*>getNameTypeList() const {return EleNameTypeList;}
@@ -138,6 +148,7 @@ public:
     Type* getTypeAt(int i) const;
 
     int find(std::string n) const;
+    bool contains(std::string n) const;
 
     Type* getTypeAt(std::string n) const;
     Type* getType(std::string n) const;
@@ -158,7 +169,8 @@ public:
     Type* getImpl(std::string &n) { 
         return Impl.find(n) == Impl.end()? nullptr: Impl[n]; 
     }
-    std::vector<Lexeme> getTemp() const {return Temp;}
+    void InsertField(std::string &n, Type* ty); 
+    std::vector<TypeTy*> getTemp() const {return Temp;}
     bool HasTemp() const {return !Temp.empty();}
     Type* OperationFinalOutput(lex::Tok op, const Type* type);
     bool UnaryOpMatch(lex::Tok op);
@@ -177,6 +189,20 @@ public:
     Type* OperationFinalOutput(lex::Tok op, const Type* type);
     bool UnaryOpMatch(lex::Tok op);
     KindType type() const { return TypeArray; }
+};
+
+class TypeTy: public Type{
+private:
+    uint32_t TyId;
+public:
+    TypeTy();
+    ~TypeTy();
+
+    uint32_t getContainedId() const { return TyId; }
+
+    Type* OperationFinalOutput(lex::Tok op, const Type* type);
+    bool UnaryOpMatch(lex::Tok op);
+    KindType type() const { return TypeContainedTy; }
 };
 
 
@@ -215,10 +241,11 @@ class TypeGenerator{
     static FloatType* GenerateFltType(uint16_t bit);
     static ArrayType* GenerateArrType(Type* &base, int size);
     static PointerType* GeneratePtrType(int count,Type* base);
-    static StructType* GenerateStructType(std::vector<std::string>&str, std::vector<Type*>&ty,std::vector<lex::Lexeme>&temp);
+    static StructType* GenerateStructType(const std::vector<std::string>&str, const std::vector<Type*>&ty,const std::vector<TypeTy*>&temp);
     static FunctionType* GenerateFuncType(std::vector<Type*>&p_type, Type* r_type);
     static EnumType* GenerateEnumType(std::vector<std::string>&uData, std::vector<Type*>&type);
     static RefType* GenerateRefType(Type*&ty);
+    static TypeTy* GenerateTypeTy(uint32_t id);
 };
 
 }

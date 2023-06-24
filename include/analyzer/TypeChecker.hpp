@@ -17,12 +17,15 @@ private:
     // Type* RetType;
     module::Module Mod;
     Type* ResType;
+    VarTy varTy;
+    State varState;
     // ast::VALUE* ResValue;
+    module::Module mod;
     bool isInField = false;
 
-    bool CheckRHSInField(Ast *&Node, StructType *&StructTy);
-    bool CheckLHS(Ast *&Node, bool inField, StructType *type);
     bool CheckImplicitTypeCast(Ast *Node, Type *&from, Type *&to);
+    bool CheckStructStmt(StructStmt  *AstNode);
+    bool CheckStructDef(StructStmt  *AstNode);
 
     bool visit(BlockStmt *AstNode );
     bool visit(FunctionDef  *AstNode );
@@ -34,15 +37,17 @@ private:
     bool visit(BranchStmt  *AstNode );
     bool visit(VarStmt  *AstNode );
     bool visit(IfStmt  *AstNode );
+    bool visit(UseStmt  *AstNode );
     bool visit(ReturnStmt  *AstNode );
     
     bool visit(GroupedExpr  *AstNode );
-    bool visit(Expression  *AstNode );
     bool visit(ListExpr  *AstNode ) ;
     bool visit(FunctionCall  *AstNode );
-    bool visit( PostfixExpr  *AstNode );
+    bool visit(Expression  *AstNode );
+    bool visit(IndexExpr  *AstNode );
     bool visit(PrefixExpr  *AstNode );
 
+    bool visit(UserDefinedTy *AstNode);
     bool visit(Array  *AstNode ) ;
     bool visit(FnType  *AstNode );
     bool visit(PreDefineType  *AstNode );
@@ -54,8 +59,11 @@ private:
     bool visit(NullLiteral  *AstNode );
     bool visit(StringLiteral  *AstNode );
 public:
-    TypeChecker();
+    TypeChecker(module::Module& _mod)
+    :mod(_mod) {}
     ~TypeChecker();
+
+    bool CheckType();
 };
 
 

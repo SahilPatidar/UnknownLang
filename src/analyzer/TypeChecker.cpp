@@ -4,6 +4,37 @@
 
 namespace analyzer{
 
+
+bool TypeChecker::visit(Identifier *AstNode) {
+    AstNodeInfo *info;
+    if((info = Regmgr->getAstNodeinfo(AstNode->toString())) == NULL){
+        ///@todo
+    }
+    AstNode->setType(info->type);
+    AstNode->setDecl(info->Node);
+    AstNode->setDecl(info->instTy);
+    ResType = info->type;
+    return true;
+}
+
+bool TypeChecker::visit(UserDefinedTy *AstNode){
+    if(!AstNode->getExpr()->accept(*this)){
+        return false;
+    }
+    if(ResType->type() != TypeStruct) {
+        ///@todo
+    }
+    auto StTy = static_cast<StructType*>(ResType);
+    if( ( !AstNode->HasGeneric() && StTy->HasTemp() ) || ( AstNode->HasGeneric() && !StTy->HasTemp() )){
+        ///@todo
+    }
+    if(AstNode->getGeneric()->getParam().size() != StTy->getTemp().size()){
+        ///@todo
+    }
+    return 0;
+}
+
+
 bool TypeChecker::visit(PreDefineType  *AstNode) {
     switch (AstNode->getType().getTokType())
     {
@@ -74,35 +105,100 @@ bool TypeChecker::visit(FnType  *AstNode) {
     return true;
 }
 
+bool TypeChecker::CheckStructDef(StructStmt  *AstNode) {
+     AstNode->getName()->accept(*this);
+        Type* ty;
+        if(ResType->type() != TypeStruct){
+        ///todo
+        }
+        ty = ResType;
+        auto StructTy = static_cast<StructType*>(ResType);
+        if(StructTy->HasTemp()){
+            if(!AstNode->HasGenParam()){
+                if(StructTy->getTemp().size() != AstNode->getGenParamList().size()){
+                    //todo
+                }
+            }
+        }else if(AstNode->HasGenParam()){
+            //todo
+        }
+        if(AstNode->getIdentList().size() != StructTy->getNameTypeList().size()){
+            //todo
+        }else{
+            for(size_t i = 0, siz = AstNode->getIdentList().size(); i < siz; i++){
+                std::string n = AstNode->getIdentList()[i]->toString();
+                Type* Sty = StructTy->getType(n);
+                if(Sty == nullptr){
+                    ///@todo
+                }
+                if(!AstNode->getTypeList()[i]->accept(*this)){
+                    return false;
+                }
+                if(!ResType){
+                    //todo
+                }
+                if(!CheckImplicitTypeCast(AstNode->getIdentList()[i],ResType, Sty)) {
+                    ///@todo
+                }
+            }
+        }
 
-bool TypeChecker::visit(StructStmt  *AstNode) {
-    std::vector<Lexeme>Temp;
-    std::vector<std::string>ElementNameList;
-    std::vector<Type*>ElementTypeList;
-    if(Regmgr->contains(AstNode->getName().getStr())) {
+        ResType = ty;
+    return true;
+}
+
+bool TypeChecker::CheckStructStmt(StructStmt  *AstNode) {
+    Regmgr->Push_Stack();
+    std::vector<TypeTy*>Temp;
+    std::string name = AstNode->getName()->toString();
+    if(Regmgr->contains(name)) {
         //todo
     }
-    if(AstNode->HasTemplate()){
-        Temp = AstNode->getTemp();
+    if(AstNode->HasGenParam()){
+        std::vector<Lexeme>param = AstNode->getGenParamList();
+        for(int i = 0, size = param.size(); i < size; i++){
+            TypeTy* t = TypeGenerator::GenerateTypeTy(param[i].getTokTy());
+            Temp.push_back(t);
+            Regmgr->addInfo(param[i].getStr(), t, nullptr, nullptr);
+        }
     }
 
     if(AstNode->getIdentList().size() != AstNode->getTypeList().size()){
         //todo
     }
+    StructType* s = TypeGenerator::GenerateStructType({}, {}, Temp);
+    Regmgr->addInfo(name, s , nullptr , AstNode);
     for(size_t i = 0, siz = AstNode->getIdentList().size(); i < siz; i++) {
-        AstNode->getTypeList()[i]->accept(*this);
+        if(!AstNode->getTypeList()[i]->accept(*this)){
+            return false;
+        }
         if(!ResType){
             //todo
         }
-        std::string EleName = AstNode->getIdentList()[i].getStr();
-        if(std::find(ElementNameList.begin(), ElementNameList.end(), EleName) == ElementNameList.end()){
-            //todo
+        std::string EleName = AstNode->getIdentList()[i]->toString();
+        if(s->contains(EleName)){
+            ///@todo
+            return false;
         }
-        ElementNameList.push_back(EleName);
-        ElementTypeList.push_back(ResType);
+        s->InsertField(EleName, ResType);
     }
-    ResType = TypeGenerator::GenerateStructType(ElementNameList, ElementTypeList, Temp);
-    Regmgr->addInfo(AstNode->getName().getStr(), ResType, nullptr, AstNode);
+    Regmgr->Pop_Stack();
+    AstNode->setType(s);
+    Regmgr->addInfo(name, ResType, nullptr, AstNode);
+    return true;
+}
+
+bool TypeChecker::visit(StructStmt  *AstNode) {
+    if(AstNode->nodeCategory() == NodeStructStm){
+        if(!CheckStructStmt(AstNode)){
+            return false;
+        }
+    }else {
+        if(!CheckStructDef(AstNode)){
+            return false;
+        }
+    }
+    
     return true;
 }
 
@@ -209,7 +305,7 @@ bool TypeChecker::visit(FunctionDef  *AstNode) {
             if(!ResType){
                 //todo
             }
-            std::string ParamName = AstNode->getParameterNames()[i].getStr();
+            std::string ParamName = AstNode->getParameterNames()[i]->toString();
             if(std::find(ElementType.begin(),ElementType.end(),ParamName) == ElementType.end()){
                 err::dumperr("redefinition of parameter", AstNode->getParameterNames()[i], AstNode->toString());
                 return false;
@@ -233,6 +329,7 @@ bool TypeChecker::visit(FunctionDef  *AstNode) {
 
 
 bool TypeChecker::visit(FunctionCall  *AstNode) {
+    Regmgr->Push_Stack();
     if(!AstNode->getCalle()->accept(*this)) {
         ///@todo
     }
@@ -257,28 +354,44 @@ bool TypeChecker::visit(FunctionCall  *AstNode) {
             }
         }
     }
+    Regmgr->Pop_Stack();
     AstNode->setType(FuncType);
     ResType = FuncType->getRetType();
     return true;
 }
 
 bool TypeChecker::visit(VarStmt  *AstNode) {
-    AstNode->getType()->accept(*this);
-    Type* type = ResType;
-    AstNode->getVal()->accept(*this);
-    Type* valtype = ResType;
-     
-    if(!type&&!valtype){
-        ///@todo
-    }
-    if(!CheckImplicitTypeCast(AstNode->getType(), valtype, type)) {
-        ///@todo
-    }
+    if(AstNode->token().getTokTy() == CONST){
+        AstNode->getType()->accept(*this);
+        Type* type = ResType;
+        AstNode->getVal()->accept(*this);
+        Type* valtype = ResType;
 
-    if(!ResType) {
-        Regmgr->addInfo(AstNode->getVarName()->toString(), valtype, nullptr, AstNode);
-    }else {
+        if(!CheckImplicitTypeCast(AstNode->getType(), valtype, type)) {
+            ///@todo
+        }
+
         Regmgr->addInfo(AstNode->getVarName()->toString(), type, nullptr, AstNode);;
+    }else if(AstNode->token().getTokTy() == LET){
+        AstNode->getType()->accept(*this);
+        Type* type = ResType;
+        AstNode->getVal()->accept(*this);
+        Type* valtype = ResType;
+        
+        // if(!type&&!valtype){
+        //     ///@todo
+        // }
+        if(type&&valtype){
+            if(!CheckImplicitTypeCast(AstNode->getType(), valtype, type)) {
+                ///@todo
+            }
+        }
+
+        if(!ResType) {
+            Regmgr->addInfo(AstNode->getVarName()->toString(), valtype, nullptr, AstNode);
+        }else {
+            Regmgr->addInfo(AstNode->getVarName()->toString(), type, nullptr, AstNode);;
+        }
     }
 
     return true;
@@ -286,71 +399,25 @@ bool TypeChecker::visit(VarStmt  *AstNode) {
 
 
 
-bool TypeChecker::visit( PostfixExpr  *AstNode) {
-    switch (AstNode->nodeCategory())
-    {   
-    case NodeStructDef:
-    {
-        AstNode->getVar()->accept(*this);
-        Type* ty;
-        if(ResType->type() != TypeStruct){
-        ///todo
-        }
-        ty = ResType;
-        auto StructTy = static_cast<StructType*>(ResType);
-        if(StructTy->HasTemp()){
-            if(!AstNode->HasTemp()){
-                //todo
-            }
-            if(StructTy->getTemp().size() != AstNode->getTemp().size()){
-                //todo
-            }
-        }else if(AstNode->HasTemp()){
-            //todo
-        }
-        if(AstNode->getExpr().size() != StructTy->getNameTypeList().size()){
-            //todo
-        }else{
-            for(size_t i = 0, siz = AstNode->getExpr().size(); i < siz; i++){
-                AstNode->getExpr()[i]->accept(*this);
-                if(!ResType){
-                    //todo
-                }
-                if(!CheckImplicitTypeCast(AstNode->getExpr()[i],ResType, StructTy->getTypeList()[i])) {
-                    ///@todo
-                }
-            }
-        }
-
-        ResType = ty;
+bool TypeChecker::visit(IndexExpr *AstNode) {
+    AstNode->getVar()->accept(*this);
+    if(!ResType || ResType->type() != TypeArray) {
+        //todo
     }
-        break;
-    case NodeIndexExpr:
-    {
-        AstNode->getVar()->accept(*this);
-        if(!ResType || ResType->type() != TypeArray) {
-            //todo
-        }
-        Type* arrtype = ResType;
-        auto ArrTy = static_cast<ArrayType*>(ResType);
-        if((AstNode->getExpr().size() > ArrTy->getArrSize()) ||
-            AstNode->getExpr().size() < ArrTy->getArrSize()) {
-            //todo
-        }
-        for(int i = 0, size = AstNode->getExpr().size(); i < size; i++){
-            AstNode->getExpr()[i]->accept(*this);
-            if(ResType->type() != TypeInt){
-                ///@todo
-            }
-        }
-        AstNode->SetType(arrtype);
-        ResType = ArrTy->getArrType();
+    Type* arrtype = ResType;
+    auto ArrTy = static_cast<ArrayType*>(ResType);
+    if((AstNode->getIndex().size() > ArrTy->getArrSize()) ||
+        AstNode->getIndex().size() < ArrTy->getArrSize()) {
+        //todo
     }
-        
-        break;
-    default:
-        break;
+    for(int i = 0, size = AstNode->getIndex().size(); i < size; i++){
+        AstNode->getIndex()[i]->accept(*this);
+        if(ResType->type() != TypeInt){
+            ///@todo
+        }
     }
+    AstNode->SetType(arrtype);
+    ResType = ArrTy->getArrType();
 }
 
 bool TypeChecker::visit(Array  *AstNode) {
@@ -464,158 +531,70 @@ bool TypeChecker::visit(Method  *AstNode) {
     return true;
 }
 
-bool TypeChecker::CheckLHS(Ast* &Node, bool inField, StructType *type) {
-    if(inField) {
-        if(Node->nodeCategory() != NodeIdent && Node->nodeCategory() != NodeArray) {
-            //todo
-        }
-        if(Node->nodeCategory() == NodeIdent) {
-            std::string n = Node->toString();
-            if(n == ""){
-                //todo
-            }
-            if(type->find(n) == -1) {
-                //todo
-            }
-            ResType = type->getTypeAt(n); 
-        }else if(Node->nodeCategory() == NodeIndexExpr) {
-            auto Operand = static_cast<PostfixExpr*>(Node);
-            std::string Ident = Operand->getVar()->toString();
-            ResType = type->getTypeAt(Ident);
-            if(!ResType||ResType->type() != TypeArray){
-                //todo
-            }
-        }
-    }else
-        Node->accept(*this);
-   if(!ResType){
-    //todo
-   }
-   if(ResType->type() != TypeStruct && ResType->type() != TypeArray && ResType->type() != TypePointer) {
-     //todo
-   }else if(ResType->type() == TypeArray) {
-        auto Arrty = static_cast<ArrayType*>(ResType);
-        if(Arrty->getArrType()->type() != TypeStruct && Arrty->getArrType()->type() != TypePointer) {
-            //todo
-        }else if(Arrty->getArrType()->type() != TypePointer) {
-            auto PtrTy = static_cast<PointerType*>(Arrty->getArrType());
-            if(PtrTy->getBaseType()->type() != TypeStruct) {
-                //todo
-            }
-        }
-        ResType = Arrty->getArrType();
-   }else if(ResType->type() != TypePointer) {
-        auto PtrTy = static_cast<PointerType*>(ResType);
-        if(PtrTy->getBaseType()->type() != TypeStruct) {
-            //todo
-        }
-   }
-   return true;
-}
-
-bool TypeChecker::CheckRHSInField(Ast* &Node, StructType *&StructTy) {
-    if(Node->nodeCategory() == NodeCallExpr) {
-        if(!StructTy->HasImpl()){
-            ///@todo
-        }
-        auto StructImpl = StructTy->getImpl();
-        std::string n = static_cast<FunctionCall*>(Node)->getCalle()->toString();
-        if(StructImpl.find(n) == StructImpl.end()) {
-            ///@todo
-        }
-        Regmgr->Push_Stack();
-        Regmgr->addInfo(n,StructImpl[n],nullptr,Node);
-        Node->accept(*this);
-        Regmgr->Pop_Stack();
-    }else if(Node->nodeCategory() == NodeIndexExpr) {
-        auto Operand = static_cast<PostfixExpr*>(Node);
-        std::string Ident = Operand->getVar()->toString();
-        ResType = StructTy->getTypeAt(Ident);
-        if(!ResType||ResType->type() != TypeArray){
-            //todo
-        }
-    }else if(Node->nodeCategory() == NodeIdent) {
-        auto Operand = static_cast<Identifier*>(Node);
-        std::string n = Operand->toString();
-        ResType = StructTy->getTypeAt(n);
-        if(!ResType){
-            //todo
-        }
-    }else if(Node->nodeCategory() == NodeMemExpr){
-        auto Expr = static_cast<Expression*>(Node);
-        if(!Expr){
-            //todo
-        }
-        auto lhs = Expr->getLhs();
-        if(!CheckLHS(lhs, true, StructTy)) {
-            //todo
-        }
-        if(!ResType || (ResType->type() != TypeStruct && ResType->type() != TypePointer)) {
-            //todo
-        }
-
-        if(ResType->type() == TypePointer) {
-            if(Expr->getOp() != ARROW) {
-                //todo
-            }
-            auto PtrTy = static_cast<PointerType*>(ResType);
-            if(PtrTy->getBaseType()->type() != TypeStruct) {
-                //todo
-            }
-            if(PtrTy->getDefCount() > 1){
-                //todo
-            }
-        }
-
-        auto rhs = Expr->getRhs();
-        auto type = static_cast<StructType*>(ResType);
-        if(!CheckRHSInField(rhs, type)) {
-            //todo
-        }
-    }else{
-        return false;
-    }
-   return true;
-}
 
 bool TypeChecker::visit(Expression  *AstNode) {
     switch (AstNode->nodeCategory())
     {
     case NodeMemExpr:
     {
-        auto lhs = AstNode->getLhs();
-        if(!CheckLHS(lhs, false, nullptr)) {
-            //todo
+        Regmgr->Push_Stack();
+        if(!AstNode->getLhs()->accept(*this)){
             return false;
         }
 
         if(!ResType || (ResType->type() != TypeStruct && ResType->type() != TypePointer)) {
-            //todo
+                //todo
+        
         }
-
         if(ResType->type() == TypePointer) {
             if(AstNode->getOp() != ARROW) {
                 //todo
             }
             auto PtrTy = static_cast<PointerType*>(ResType);
+            if((PtrTy->getBaseType()->type() != TypeStruct) && (PtrTy->getDefCount() > 1)){
+                //todo
+            }
             if(PtrTy->getBaseType()->type() != TypeStruct) {
                 //todo
             }
             if(PtrTy->getDefCount() > 1){
                 //todo
             }
+            ResType = static_cast<PointerType*>(PtrTy->getBaseType());
+            }else if(ResType->type() == TypeStruct) {
+                if(AstNode->getOp() != DOT) {
+                    //todo
+                }
         }
 
-        auto StructTy = static_cast<StructType*>(ResType);
-
-        auto RHS = AstNode->getRhs();
-        if(!CheckRHSInField(RHS, StructTy)) {
-                //todo
+        StructType* StTy = static_cast<StructType*>(ResType);
+        if(AstNode->getRhs()->nodeCategory() == NodeMemExpr){
+            for(int i = 0, size = StTy->getNameList().size(); i < size; i++){
+                Regmgr->addInfo(StTy->getNameList()[i], StTy->getTypeList()[i], nullptr, AstNode->getLhs()->getDecl());
+            }
+            if(!AstNode->getRhs()->accept(*this)){
+                return false;
+            }
+        }else if(AstNode->getRhs()->nodeCategory() == NodeIdent){
+            ResType = StTy->getType(AstNode->getRhs()->toString());
+            if(!ResType){
+                if(!StTy->HasImpl()){
+                    ///@todo
+                }
+                auto StructImpl = StTy->getImpl();
+                std::string n = static_cast<FunctionCall*>(AstNode->getRhs())->getCalle()->toString();
+                if(StructImpl.find(n) == StructImpl.end()) {
+                    ///@todo
+                }
+                ResType = StructImpl[n];
+            }
         }
+        Regmgr->Pop_Stack();
     }
         break;
     case NodeBinaryExpr:
     {
+        
         if(!AstNode->getLhs()->accept(*this)){
             ///@todo
         }
@@ -623,27 +602,43 @@ bool TypeChecker::visit(Expression  *AstNode) {
             //todo
         }
         Type* LHS = ResType;
+        
         if(!AstNode->getRhs()->accept(*this)){
             ///@todo
         }
+        
         if(!ResType) {
             //todo
         }
+        
         Type* RHS = ResType;
-        if(LHS->IsValidOperation(AstNode->getOp(),ResType)) {
 
+        if(AstNode->getOp().IsAssignOP() ) {
+            if(LHS->isConst()&&(RHS->type() == TypeRef && !RHS->isConst())){
+                ///@todo
+            }
+            if( varTy == UnInitialized ) {
+                
+            }
+        }else if(AstNode->getOp().IsAssnCombinedOP()){
+            if( LHS->isConst() && !RHS->isConst() ){
+                ///@todo
+            }
+            if(varTy == UnInitialized) {
+                ///@todo
+            }
+        }
+        if(!LHS->IsValidOperation(AstNode->getOp(),ResType)) {
+            ///@todo
         }
         ResType = LHS->OperationFinalOutput(AstNode->getOp(), RHS);
-        if(LHS->type() == ResType->type()){
+        if(LHS->type() != ResType->type()){
             if(!CheckImplicitTypeCast(AstNode->getLhs(), LHS, ResType)) {
                 ///@todo
             }
-        }else if(RHS->type() == ResType->type()){
+        }
+        if(RHS->type() != ResType->type()){
             if(!CheckImplicitTypeCast(AstNode->getRhs(), RHS, ResType)) {
-                ///@todo
-            }
-        }else {
-            if(!CheckImplicitTypeCast(AstNode->getRhs(), RHS, ResType)&&!CheckImplicitTypeCast(AstNode->getLhs(), LHS, ResType)) {
                 ///@todo
             }
         }
@@ -671,11 +666,51 @@ bool TypeChecker::visit(Expression  *AstNode) {
     case NodePath:
     {
         std::string n = AstNode->getLhs()->toString();
-        Mod.
+        module::Module *tmp = mod.getSubMod(n);
+        
+        if(AstNode->getRhs()->nodeCategory() == NodeIdent){
+            
+        }else if(!AstNode->getRhs()->accept(*this)){
+            return false;
+        }
+        auto node = AstNode;
+        while(true) {
+            if(node->getLhs()->nodeCategory() == NodeIdent){
+                tmp = mod.getSubMod(n);
+            }
+            if(node->getRhs()->nodeCategory() == NodeIdent){
+                tmp = mod.getSubMod(n);
+            }else if(node->getRhs()->nodeCategory() == NodePath){
+                node = static_cast<Expression*>(node->getRhs());
+            }else if(node->getRhs()->nodeCategory() == NodeBlockStm){
+                break;
+            }else{
+                ///@todo
+            }
+            if(tmp == NULL){
+                ///@todo
+            }
+        }
+
+        tmp->
+        if(node->getRhs()->nodeCategory() == NodeBlockStm){
+            auto block = static_cast<BlockStmt*>(node->getRhs());
+            for(int i = 0, size = block->getStmts().size(); i < size; i++){
+                std::string s = block->getStmts()[i]->toString();
+                auto item = tmp->getModItems(s);
+                if(!item){
+                    ///@todo
+                }
+
+
+            }
+        }
     }
+    break;
     default:
         break;
     }
+    return true;
 }
 
 bool TypeChecker::visit(BlockStmt *AstNode) {
@@ -730,6 +765,11 @@ bool TypeChecker::visit(IfStmt  *AstNode) {
     AstNode->getElBlock()->accept(*this);
     Regmgr->Pop_Stack();
     return true;
+}
+
+
+bool TypeChecker::visit(UseStmt *AstNode){
+    AstNode->getPath();
 }
 
 }

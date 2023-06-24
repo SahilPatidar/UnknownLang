@@ -7,11 +7,22 @@
 
 using namespace ast;
 
+const enum VarTy{
+    TypeDecl,
+    VarDecl,
+    Lit
+};
+const enum State{
+    Initialized,
+    UnInitialized,
+};
 
 struct AstNodeInfo {
     Type* type;
     ast::VALUE* val;
     Ast* Node;
+    VarTy instTy;
+    State state;
 };
 
 class StackVal{
@@ -97,7 +108,7 @@ public:
     Type* getGlobalFunc(std::string n);
     bool contains(std::string n);
     ast::VALUE* getVal(std::string n, bool fromGlobal, bool fromFunc);
-    AstNodeInfo* getAstNodeinfo(std::string n, bool fromGlobal, bool fromFunc);
+    AstNodeInfo* getAstNodeinfo(std::string n);
 };
 
 
